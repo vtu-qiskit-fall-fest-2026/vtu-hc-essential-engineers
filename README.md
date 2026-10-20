@@ -307,6 +307,6 @@ Released under the [MIT License](LICENSE). See `LICENSE` for details.
 **Essential Engineers** · Team ID `VTU-QFF-HC-0173` · Tier `Both`
 · Built with ⚛️ Qiskit for the VTU-QFF Hackathon
 
-[⬆ Back to Top](#Essential Engineers)
+[⬆ Back to Top](#essential-engineers)
 
 </div>
