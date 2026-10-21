@@ -55,3 +55,16 @@ Thumbs.db
 .idea/
 .vscode/
 *.swp
+
+# Keep the credential template (the .env.* rule above would hide it)
+!.env.example
+
+# IBM Quantum saved-account file
+qiskit-ibm.json
+
+# Nirikshak run outputs (commit curated releases explicitly)
+data/raw/
+data/hardware/*.json
+
+# Private demo notes
+DEMO.md
