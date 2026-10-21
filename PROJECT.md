@@ -22,9 +22,9 @@ Eavesdropper detectors for QKD are trained and tested almost entirely in simulat
 
 ## 3. Problem Description
 
-Quantum Key Distribution (QKD) lets two parties share a secret key with security guaranteed by physics: any eavesdropper disturbs the quantum states and raises the error rate. That guarantee only holds in practice if the system can reliably detect the eavesdropper. Today detection relies on a fixed error-rate threshold (about 11% for BB84) or on newer machine-learning detectors, and almost all of them are built and tested only on simulated data.
+Quantum Key Distribution (QKD) lets two parties share a secret key with security guaranteed by physics: any eavesdropper disturbs the quantum states and raises the error rate. The often-quoted 11% QBER threshold for BB84 comes from the security proof (Shor-Preskill): it is the largest error rate at which a secret key can still be distilled, not an attack detector. Below it, privacy amplification can still protect an ideal key, but the operator learns nothing about whether the link is being tapped. Detecting and locating an intrusion is left to fixed thresholds or to newer machine-learning detectors, and almost all of them are built and tested only on simulated data.
 
-Real QKD links are not as clean as simulations. Their noise drifts with temperature, component aging and recalibration. Recent studies show that detectors trained in simulation lose much of their accuracy when operating conditions shift even slightly, and that partial attacks can stay below the standard threshold. This leaves two failure modes. The detector either mistakes normal drift for an attack and throws away valid keys, effectively a denial of service, or mistakes a real attack for normal noise and leaks the key to the eavesdropper.
+Real QKD links are not as clean as simulations. Their noise drifts with temperature, component aging and recalibration. Recent studies show that detectors trained in simulation lose much of their accuracy when operating conditions shift even slightly, and that partial attacks can stay below the standard threshold. This leaves two failure modes. The detector either mistakes normal drift for an attack and throws away valid keys, effectively a denial of service, or mistakes a real attack for normal noise and the tap goes unnoticed: operators cannot locate or respond to it, and practical systems that budget for an expected noise level end up trusting it more than they should.
 
 Recent research names testing on real hardware data as an open problem, and European cybersecurity agencies have said QKD is not yet mature from a security perspective. Meanwhile, deployment is accelerating: India's National Quantum Mission has announced a 1,000 km QKD network, and DRDO has completed field and live-network trials. To our knowledge, no open benchmark measures how eavesdropper detectors perform on real quantum hardware, and no detector has been shown to keep its false-alarm rate stable under device drift while still catching attacks.
 
@@ -33,8 +33,8 @@ Recent research names testing on real hardware data as an open problem, and Euro
 Nirikshak is an open benchmark that tests BB84 eavesdropper detectors on real quantum hardware, together with a detector designed to stay reliable under device drift. It is built with Qiskit and run on IBM Quantum hardware (Heron r2).
 
 1. **Real attacks on real qubits.** We run honest BB84 sessions and qubit-level attacks (full and partial intercept-resend, and an entangling-probe attack) on IBM hardware, using mid-circuit measurement and dynamic circuits, repeated across different qubits and sessions to capture real noise and drift.
-2. **Simulation-to-hardware stress test.** Widely used detectors (the QBER threshold, Random Forest and XGBoost on temporal features, and a small quantum classifier) are trained on simulator data and evaluated on hardware data. We report miss rates at a fixed false-alarm budget, plus normal and worst-case results.
-3. **Drift-robust detector.** Honest reference rounds interleaved with the key rounds and the backend's calibration data let the detector separate normal device drift from eavesdropping. Thresholds are set with conformal calibration, which gives a false-alarm rate we can state in advance.
+2. **Simulation-to-hardware stress test.** Widely used detectors (a sim-calibrated QBER threshold, Random Forest and XGBoost on per-block features) are trained on simulator data and evaluated on drifted simulation and real hardware data. We report miss rates at a fixed false-alarm budget, plus normal and worst-case results.
+3. **Drift-robust detector.** In every run, a separate honest calibration circuit on the same qubits (no channel, so Eve cannot touch it) measures that session's noise, letting the detector separate normal device drift from eavesdropping. All circuits share the same timing, with a spin echo on idle qubits, so they differ only by Eve. Thresholds are set with conformal calibration, which gives a false-alarm rate we can state in advance.
 4. **Open dataset and dashboard.** We release, to our knowledge, the first public dataset of hardware-generated BB84 attack logs, a reusable scorecard, and a live dashboard comparing a simulation-trained detector with Nirikshak on real hardware data.
 
 **Scope note:** IBM's superconducting qubits provide real quantum noise and drift, and attacks run as real qubit operations. Optical-only attacks such as photon-number splitting and detector blinding are simulated and clearly labelled.
@@ -52,9 +52,9 @@ Nirikshak is an open benchmark that tests BB84 eavesdropper detectors on real qu
 | 1 | Protocol engine | BB84 rounds as Qiskit circuits; many rounds run in parallel on separate qubits in each shot; parameterized circuits for basis and attack sweeps |
 | 2 | Attack library | Full intercept-resend, partial intercept, entangling probe (weak coupling to an ancilla), adaptive variants using `if_test`; simulated optical attacks (PNS, blinding) labelled as such |
 | 3 | Noise and drift models | Aer noise models from backend calibration data; benign drift scenarios |
-| 4 | Hardware runner | Qiskit IBM Runtime Sampler in job or batch mode on `ibm_kingston`; honest reference rounds interleaved with the key rounds |
+| 4 | Hardware runner | Qiskit IBM Runtime Sampler in job or batch mode on `ibm_kingston`; a key circuit and an honest reference circuit per session on the same qubits, timing matched |
 | 5 | Feature extraction | Per-block QBER per basis, temporal moments, basis asymmetry, reference-round deviation, calibration features |
-| 6 | Baseline detectors | 11% threshold, Random Forest, XGBoost, small quantum classifier (qiskit-machine-learning, optional) |
+| 6 | Baseline detectors | 11% rule, sim-calibrated threshold, Random Forest, XGBoost (trained on simulation) |
 | 7 | Nirikshak detector | Drift-aware features plus conformal-calibrated thresholds with a stated false-alarm rate |
 | 8 | Scorecard | Miss rate at a fixed false-alarm budget; normal vs shifted; worst case; sim-trained vs hardware-tested |
 | 9 | Dashboard | Streamlit: live QBER, alarms, side-by-side baseline vs Nirikshak, attack injection |
@@ -78,7 +78,7 @@ Eve measures in her chosen basis, then undoes the basis rotation, which re-sends
 | Disk | 178 GB free |
 | OS / Python | Ubuntu 24.04, Python 3.12.3, uv available; Qiskit not yet installed |
 
-All simulation, dataset generation, training, calibration and the dashboard fit comfortably. BB84 rounds use 1 to 2 qubits each. Use the stabilizer method for Clifford rounds; simulate entangling-probe rounds (non-Clifford) individually. Keep the quantum classifier small (4 to 8 qubits, sampled data).
+All simulation, dataset generation, training, calibration and the dashboard fit comfortably. BB84 rounds use 1 to 2 qubits each. Aer's matrix product state method keeps this cheap: rounds are single qubits or signal-ancilla pairs, so there is almost no entanglement to track.
 
 ### 6.2 IBM Quantum Open Plan (checked against IBM docs)
 
@@ -131,7 +131,7 @@ Known issue: qiskit-aer and scikit-learn each bundle `libgomp`; importing both r
 |---|---|---|---|
 | 0-3 | Environment, pinned versions, hour-0 IBM check | Feature spec, baseline skeleton | Dashboard skeleton |
 | 3-10 | BB84 circuits, parallel-round layout, attack library (simulator) | Threshold baseline, simulated dataset generation | Live charts |
-| 10-16 | **Submit hardware jobs early** (honest + attacks, interleaved reference rounds) | RF / XGBoost on simulated data | Attack-injection controls |
+| 10-16 | **Submit hardware jobs early** (honest + attacks, with reference circuits) | RF / XGBoost on simulated data | Attack-injection controls |
 | 16-28 | Collect hardware runs across qubits/sessions | Hardware dataset assembly, sim-to-real stress test | Wire models to UI |
 | 28-38 | Second hardware batch if budget allows | Nirikshak drift-aware detector + conformal calibration | Scorecard view, dataset card |
 | 38-44 | Code freeze, reproducibility check | Results figures | README, slides |
