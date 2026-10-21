@@ -20,12 +20,17 @@ def make_simulator(noise_model: NoiseModel | None = None, seed: int | None = Non
 def run(template: BB84Template, rounds: Rounds, shots: int = 64,
         backend: AerSimulator | None = None) -> dict[str, np.ndarray]:
     """Returns bool arrays of shape (n_bindings, shots, n_rounds) per classical register."""
+    return run_many([(template, rounds)], shots=shots, backend=backend)[0]
+
+
+def run_many(cases: list[tuple[BB84Template, Rounds]], shots: int = 64,
+             backend: AerSimulator | None = None) -> list[dict[str, np.ndarray]]:
+    """Run several templates as PUBs of one Sampler call (one job on hardware)."""
     backend = backend or make_simulator()
-    tqc = transpile(template.circuit, backend)
-    sampler = BackendSamplerV2(backend=backend)
-    result = sampler.run([(tqc, template.parameter_values(rounds))], shots=shots).result()[0]
-    return {name: bits_to_array(getattr(result.data, name))
-            for name in ("bob", "eve") if hasattr(result.data, name)}
+    pubs = [(transpile(t.circuit, backend), t.parameter_values(r)) for t, r in cases]
+    result = BackendSamplerV2(backend=backend).run(pubs, shots=shots).result()
+    return [{name: bits_to_array(getattr(res.data, name)) for name in ("bob", "eve") if hasattr(res.data, name)}
+            for res in result]
 
 
 def bits_to_array(bit_array) -> np.ndarray:
