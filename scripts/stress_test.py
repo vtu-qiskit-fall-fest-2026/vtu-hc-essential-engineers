@@ -32,9 +32,13 @@ def load_test_sets() -> dict[str, pd.DataFrame]:
             sets[label] = pd.read_parquet(p)
     for p in sorted(HW.glob("*.parquet")):
         df = pd.read_parquet(p)
-        timed = "slot_dt" in df and (df["slot_dt"] > 0).all()
-        sets[f"hardware: {df['backend_name'].iloc[0]} batch {df['batch'].iloc[0]}"
-             f" ({'timing matched' if timed else 'timing NOT matched'})"] = df
+        if "timing" in df:
+            timing = df["timing"].iloc[0]
+        else:
+            timing = "delay" if "slot_dt" in df and (df["slot_dt"] > 0).all() else "none"
+        label = {"none": "timing NOT matched", "delay": "timing matched, plain idle",
+                 "echo": "timing matched, spin echo"}[timing]
+        sets[f"hardware: {df['backend_name'].iloc[0]} batch {df['batch'].iloc[0]} ({label})"] = df
     return sets
 
 
