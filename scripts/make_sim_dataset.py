@@ -2,6 +2,7 @@
 
     python scripts/make_sim_dataset.py                       # all regimes
     python scripts/make_sim_dataset.py --regimes train drift  # skip the slow FakeKingston regime
+    python scripts/make_sim_dataset.py --regimes train --seed 1 --suffix _test   # independent test set
 
 Regimes (one noise draw per session; the device "drifts" between sessions):
     train     readout 1-2%, symmetric, low gate noise: the clean world detectors are trained in
@@ -48,6 +49,7 @@ def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--regimes", nargs="*", default=list(REPEATS), choices=list(REPEATS))
     ap.add_argument("--seed", type=int, default=0)
+    ap.add_argument("--suffix", default="", help="output name suffix, e.g. _test -> train_test.parquet")
     args = ap.parse_args()
     OUT.mkdir(parents=True, exist_ok=True)
 
@@ -59,12 +61,12 @@ def main() -> None:
             seed0 = args.seed * 1_000_000 + r_idx * 10_000 + rep * 100
             for spec in standard_conditions(seed0=seed0):
                 backend, noise = backend_for(regime, rng)
-                tables.append(simulate_session(spec, backend=backend, session_id=f"{regime}:{spec.seed}",
+                tables.append(simulate_session(spec, backend=backend, session_id=f"{regime}{args.suffix}:{spec.seed}",
                                                regime=regime, backend_name=backend.name, **noise))
             print(f"{regime}: repeat {rep + 1}/{REPEATS[regime]} done, {time.time() - t0:.0f}s", flush=True)
         df = pd.concat(tables, ignore_index=True)
-        df.to_parquet(OUT / f"{regime}.parquet", index=False)
-        print(f"{regime}: {df.session_id.nunique()} sessions, {len(df)} blocks -> {OUT / f'{regime}.parquet'}", flush=True)
+        df.to_parquet(OUT / f"{regime}{args.suffix}.parquet", index=False)
+        print(f"{regime}: {df.session_id.nunique()} sessions, {len(df)} blocks -> {OUT / f'{regime}{args.suffix}.parquet'}", flush=True)
 
 
 if __name__ == "__main__":

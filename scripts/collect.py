@@ -45,7 +45,7 @@ def plan(args):
         service = get_service()
         backend = service.backend(DEFAULT_BACKEND)
     pubs, layouts, slot_dt = compile_sessions(sessions, backend, exclude=args.exclude, seed=args.batch,
-                                              match_timing=not args.no_match_timing)
+                                              timing=args.timing)
     shots = {s.spec.shots for s in sessions}
     assert len(shots) == 1, "all sessions in a job must use the same shots"
     n_exec = sum(s.spec.executions for s in sessions)
@@ -81,7 +81,7 @@ def submit(args):
     job_id = job.job_id()
     meta = {"job_id": job_id, "backend": backend.name, "batch": args.batch, "fake": args.fake,
             "submitted": time.strftime("%Y-%m-%dT%H:%M:%S%z"), "shots": shots, "executions": n_exec,
-            "estimate_seconds": est, "exclude": args.exclude, "layouts": layouts, "slot_dt": slot_dt,
+            "estimate_seconds": est, "exclude": args.exclude, "layouts": layouts, "slot_dt": slot_dt, "timing": args.timing,
             "specs": specs_to_json(sessions),
             "calibration_at_submit": calibration_snapshot(backend, sorted({q for l in layouts for q in l}))}
     RAW.mkdir(parents=True, exist_ok=True)
@@ -98,7 +98,8 @@ def save_results(meta, sessions, result, usage, backend):
     regime = "fake_kingston" if meta.get("fake") else "hardware"
     table, bits = decode(sessions, result, meta["layouts"], job_id=meta["job_id"], batch=meta["batch"],
                          backend_name=meta["backend"], regime=regime, submitted=meta["submitted"],
-                         slot_dt=meta.get("slot_dt", 0))
+                         slot_dt=meta.get("slot_dt", 0),
+                         timing=meta.get("timing", "delay" if meta.get("slot_dt") else "none"))
     out_dir = RAW if meta.get("fake") else HW
     out_dir.mkdir(parents=True, exist_ok=True)
     table.to_parquet(out_dir / f"{meta['job_id']}.parquet", index=False)
@@ -140,7 +141,8 @@ def main():
     ap.add_argument("--small", action="store_true", help="tiny sessions (for testing)")
     ap.add_argument("--honest-repeats", type=int, default=3)
     ap.add_argument("--exclude", type=int, nargs="*", default=[], help="physical qubits to avoid")
-    ap.add_argument("--no-match-timing", action="store_true", help="skip the slot timing match (batch 1 behaviour)")
+    ap.add_argument("--timing", choices=["echo", "delay", "none"], default="echo",
+                    help="echo (default): matched slot with spin echo; delay: batch 2; none: batch 1")
     ap.add_argument("--max-seconds", type=float, default=60, help="refuse to submit above this estimate")
     args = ap.parse_args()
     if args.fetch:
