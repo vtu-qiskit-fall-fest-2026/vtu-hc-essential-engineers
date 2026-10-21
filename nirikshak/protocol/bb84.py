@@ -60,7 +60,9 @@ class BB84Template:
         return np.stack([by_name[p.name] for p in self.circuit.parameters], axis=1)
 
 
-def build_template(n_rounds: int, attack: Attack | None = None) -> BB84Template:
+def build_template(n_rounds: int, attack: Attack | None = None, slot_delay: int = 0) -> BB84Template:
+    """slot_delay (in backend dt) idles every signal qubit after Eve's slot, so that circuits with
+    and without an attack spend the same time between preparation and measurement (hardware only)."""
     attack = attack or NoAttack()
     a_bit = ParameterVector("a_bit", n_rounds)
     a_basis = ParameterVector("a_basis", n_rounds)
@@ -83,6 +85,8 @@ def build_template(n_rounds: int, attack: Attack | None = None) -> BB84Template:
     for i in range(n_rounds):
         anc = ancilla[i] if ancilla else None
         attack.apply(qc, i, signal[i], e_basis[i], eve, anc)
+    if slot_delay > 0:
+        qc.delay(int(slot_delay), signal, unit="dt")
     qc.barrier()
     for i in range(n_rounds):
         qc.ry(b_basis[i], signal[i])

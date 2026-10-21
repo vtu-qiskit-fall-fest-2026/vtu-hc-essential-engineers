@@ -9,24 +9,39 @@ import pandas as pd
 
 from nirikshak.hardware.calibration import pick_layout
 from nirikshak.hardware.runner import compile_template, signal_qubits
+from nirikshak.hardware.timing import slot_duration
+from nirikshak.protocol.bb84 import build_template
 from nirikshak.session import Session, SessionSpec, build_session, session_table
 from nirikshak.sim import bits_to_array
 
 
-def compile_sessions(sessions: list[Session], backend, exclude=(), seed: int | None = None):
-    """Returns (pubs, layouts). Key and reference circuits of a session share the same signal qubits."""
+def compile_sessions(sessions: list[Session], backend, exclude=(), seed: int | None = None,
+                     match_timing: bool = True):
+    """Returns (pubs, layouts, slot_dt). Key and reference circuits of a session share the same
+    signal qubits. With match_timing, every circuit is padded to the same slot duration slot_dt."""
+    layouts_full = [pick_layout(backend, s.key, exclude=exclude) for s in sessions]
+    slot_dt = 0
+    if match_timing:
+        slot_dt = max(slot_duration(compile_template(s.key, backend, layout=lay, seed=seed), backend)
+                      for s, lay in zip(sessions, layouts_full))
     pubs, layouts = [], []
-    for s in sessions:
+    for s, layout in zip(sessions, layouts_full):
         n = s.spec.n_rounds
-        layout = pick_layout(backend, s.key, exclude=exclude)
-        key_isa = compile_template(s.key, backend, layout=layout, seed=seed)
-        ref_isa = compile_template(s.ref, backend, layout=layout[:n], seed=seed)
+        key_t, ref_t = s.key, s.ref
+        if match_timing:
+            own = slot_duration(compile_template(s.key, backend, layout=layout, seed=seed), backend)
+            key_t = build_template(n, s.key.attack, slot_delay=slot_dt - own)
+            ref_t = build_template(n, None, slot_delay=slot_dt)
+        key_isa = compile_template(key_t, backend, layout=layout, seed=seed)
+        ref_isa = compile_template(ref_t, backend, layout=layout[:n], seed=seed)
         if signal_qubits(key_isa, n) != signal_qubits(ref_isa, n):
             raise RuntimeError("key and reference circuits landed on different qubits")
-        pubs += [(key_isa, s.key.parameter_values(s.key_rounds)),
-                 (ref_isa, s.ref.parameter_values(s.ref_rounds))]
+        if match_timing and not slot_duration(key_isa, backend) == slot_duration(ref_isa, backend) == slot_dt:
+            raise RuntimeError("timing match failed")
+        pubs += [(key_isa, key_t.parameter_values(s.key_rounds)),
+                 (ref_isa, ref_t.parameter_values(s.ref_rounds))]
         layouts.append(signal_qubits(key_isa, n))
-    return pubs, layouts
+    return pubs, layouts, slot_dt
 
 
 def specs_to_json(sessions: list[Session]) -> list[dict]:

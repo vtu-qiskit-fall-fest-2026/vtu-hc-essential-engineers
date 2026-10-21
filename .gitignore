@@ -69,3 +69,6 @@ data/hardware/*.json
 
 # Private demo notes
 DEMO.md
+
+# Personal Q&A notes
+QA.md
