@@ -60,7 +60,12 @@ class BB84Template:
         return np.stack([by_name[p.name] for p in self.circuit.parameters], axis=1)
 
 
-def build_template(n_rounds: int, attack: Attack | None = None) -> BB84Template:
+def build_template(n_rounds: int, attack: Attack | None = None, slot_dt: int = 0,
+                   echo_x_dt: int | None = None) -> BB84Template:
+    """slot_dt > 0 (hardware only, in backend dt): every signal qubit Eve does not touch idles for
+    exactly slot_dt between preparation and measurement, so circuits with and without an attack
+    have the same timing. With echo_x_dt (the X gate duration), the idle is a spin echo
+    (wait, X, wait, X, wait) that cancels static phase drift; otherwise a plain delay."""
     attack = attack or NoAttack()
     a_bit = ParameterVector("a_bit", n_rounds)
     a_basis = ParameterVector("a_basis", n_rounds)
@@ -83,6 +88,10 @@ def build_template(n_rounds: int, attack: Attack | None = None) -> BB84Template:
     for i in range(n_rounds):
         anc = ancilla[i] if ancilla else None
         attack.apply(qc, i, signal[i], e_basis[i], eve, anc)
+    if slot_dt > 0:
+        touched = attack.attacked_mask(n_rounds) if attack.fraction > 0 else np.zeros(n_rounds, bool)
+        for i in np.flatnonzero(~touched):
+            _idle(qc, signal[i], int(slot_dt), echo_x_dt)
     qc.barrier()
     for i in range(n_rounds):
         qc.ry(b_basis[i], signal[i])
@@ -91,3 +100,18 @@ def build_template(n_rounds: int, attack: Attack | None = None) -> BB84Template:
     # If the attack never touches e_basis, those parameters are absent from the circuit;
     # parameter_values() only emits parameters the circuit actually has.
     return BB84Template(qc, n_rounds, attack, a_bit, a_basis, b_basis, e_basis)
+
+
+def _idle(qc: QuantumCircuit, qubit, slot_dt: int, echo_x_dt: int | None) -> None:
+    if echo_x_dt is None:
+        qc.delay(slot_dt, qubit, unit="dt")
+        return
+    free = slot_dt - 2 * echo_x_dt
+    if free < 6:
+        raise ValueError("slot too short for a spin echo")
+    d1, d2 = free // 4, free // 2
+    qc.delay(d1, qubit, unit="dt")
+    qc.x(qubit)
+    qc.delay(d2, qubit, unit="dt")
+    qc.x(qubit)
+    qc.delay(free - d1 - d2, qubit, unit="dt")

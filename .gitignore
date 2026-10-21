@@ -64,7 +64,11 @@ qiskit-ibm.json
 
 # Nirikshak run outputs (commit curated releases explicitly)
 data/raw/
+data/sim/
 data/hardware/*.json
 
 # Private demo notes
 DEMO.md
+
+# Personal Q&A notes
+QA.md
