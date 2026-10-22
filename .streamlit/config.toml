@@ -1,0 +1,5 @@
+# Demo stability: do not watch or hot-reload source files. Reloading modules that load native
+# libraries (qiskit-aer, scikit-learn) inside a running server can crash it. Restart to pick up changes.
+[server]
+fileWatcherType = "none"
+runOnSave = false

@@ -35,3 +35,9 @@ hardware: ibm_kingston batch 1 (timing NOT matched),intercept 8/16 rounds,0.95,1
 "hardware: ibm_kingston batch 3 (timing matched, spin echo)",intercept 2/16 rounds,0.0,0.95,0.95,1.0,1.0,0.95
 "hardware: ibm_kingston batch 3 (timing matched, spin echo)",intercept 4/16 rounds,0.05,1.0,1.0,1.0,1.0,1.0
 "hardware: ibm_kingston batch 3 (timing matched, spin echo)",intercept 8/16 rounds,0.95,1.0,1.0,1.0,1.0,1.0
+"hardware: ibm_kingston batch 4 (timing matched, spin echo)",entangling probe (all),0.0,0.8666666666666667,0.9,0.9333333333333333,0.8333333333333334,0.8333333333333334
+"hardware: ibm_kingston batch 4 (timing matched, spin echo)",honest (false alarms),0.0,0.03333333333333333,0.016666666666666666,0.06666666666666667,0.03333333333333333,0.0
+"hardware: ibm_kingston batch 4 (timing matched, spin echo)",intercept 1/16 rounds,0.0,0.45,0.45,0.45,0.45,0.45
+"hardware: ibm_kingston batch 4 (timing matched, spin echo)",intercept 2/16 rounds,0.0,0.9,0.85,0.9,0.9,0.85
+"hardware: ibm_kingston batch 4 (timing matched, spin echo)",intercept 4/16 rounds,0.1,1.0,1.0,1.0,1.0,1.0
+"hardware: ibm_kingston batch 4 (timing matched, spin echo)",intercept 8/16 rounds,0.9,1.0,1.0,1.0,1.0,1.0

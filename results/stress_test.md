@@ -68,3 +68,14 @@ All detectors except Nirikshak were trained or calibrated on `data/sim/train.par
 | intercept 4/16 rounds | 5% | 100% | 100% | 100% | 100% | 100% |
 | intercept 8/16 rounds | 95% | 100% | 100% | 100% | 100% | 100% |
 | entangling probe (all) | 0% | 97% | 92% | 93% | 90% | 83% |
+
+## hardware: ibm_kingston batch 4 (timing matched, spin echo)
+
+| Condition | 11% rule | sim-calibrated threshold | Random Forest (sim-trained) | XGBoost (sim-trained) | XGBoost + reference features | Nirikshak |
+| :--- | :-: | :-: | :-: | :-: | :-: | :-: |
+| honest (false alarms) | 0% | 3% | 2% | 7% | 3% | 0% |
+| intercept 1/16 rounds | 0% | 45% | 45% | 45% | 45% | 45% |
+| intercept 2/16 rounds | 0% | 90% | 85% | 90% | 90% | 85% |
+| intercept 4/16 rounds | 10% | 100% | 100% | 100% | 100% | 100% |
+| intercept 8/16 rounds | 90% | 100% | 100% | 100% | 100% | 100% |
+| entangling probe (all) | 0% | 87% | 90% | 93% | 83% | 83% |

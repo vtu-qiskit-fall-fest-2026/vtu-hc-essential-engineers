@@ -189,14 +189,15 @@ vtu-hc-essential-engineers/
 │   ├── conditions.py        # standard attack conditions (simulation and hardware)
 │   ├── sim.py               # Aer runner (same Sampler V2 interface as hardware)
 │   └── dashboard.py         # dashboard launcher (python -m nirikshak.dashboard)
-├── app/dashboard.py         # Streamlit dashboard (simulator mode)
+├── app/dashboard.py         # Streamlit dashboard: hardware results, stress test, simulator
 ├── scripts/
 │   ├── check_ibm.py         # account check (free, submits no jobs)
 │   ├── hw_smoke.py          # small hardware test (dry run free; --submit uses quantum time)
 │   ├── make_sim_dataset.py  # simulated block dataset (train, drift, kingston regimes)
 │   ├── collect.py           # hardware batch: plan, --submit, --fetch
-│   └── stress_test.py       # sim-trained detectors vs Nirikshak on all test sets
-├── results/                 # stress_test.md / .csv
+│   ├── stress_test.py       # sim-trained detectors vs Nirikshak on all test sets
+│   └── hardware_lessons.py  # per-batch honest / touched / untouched QBER from raw bits
+├── results/                 # stress_test.md / .csv, hardware_lessons.csv
 ├── tests/                   # pytest suite
 ├── data/hardware/           # hardware block datasets (one parquet per job)
 ├── data/sim/                # simulated block datasets (train, train_test, drift, kingston)
