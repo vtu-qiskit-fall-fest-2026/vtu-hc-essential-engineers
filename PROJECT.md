@@ -127,15 +127,29 @@ Known issue: qiskit-aer and scikit-learn each bundle `libgomp`; importing both r
 
 ## 7. 48-Hour Plan (team of 3)
 
-| Hours | A: Quantum circuits and attacks | B: Data, ML and calibration | C: Frontend, docs and pitch |
-|---|---|---|---|
-| 0-3 | Environment, pinned versions, hour-0 IBM check | Feature spec, baseline skeleton | Dashboard skeleton |
-| 3-10 | BB84 circuits, parallel-round layout, attack library (simulator) | Threshold baseline, simulated dataset generation | Live charts |
-| 10-16 | **Submit hardware jobs early** (honest + attacks, with reference circuits) | RF / XGBoost on simulated data | Attack-injection controls |
-| 16-28 | Collect hardware runs across qubits/sessions | Hardware dataset assembly, sim-to-real stress test | Wire models to UI |
-| 28-38 | Second hardware batch if budget allows | Nirikshak drift-aware detector + conformal calibration | Scorecard view, dataset card |
-| 38-44 | Code freeze, reproducibility check | Results figures | README, slides |
-| 44-48 | Demo rehearsal (3+ runs) | Demo rehearsal | Demo rehearsal |
+Revised 21 Oct 2026, 22:00 IST (hour 7). Most building is done by Dipankar; Bhuvanesh (lead) owns
+slides, the demo video and presenting; Anusha runs a clean install on her laptop and hardware
+batches from her account.
+
+### Done (hours 0-7)
+
+- BB84 simulation, intercept-resend and entangling-probe attacks, honest reference circuits
+- Timing-matched hardware emulation with spin echo; 4 `ibm_kingston` batches (43 s of quantum time)
+- Simulated datasets (train, drift, Kingston snapshot), sim-trained Random Forest / XGBoost
+- Stress test, session verdict (permutation test), BB84 key rate, exact confidence intervals
+- README with results, first dashboard
+
+### Remaining
+
+| When | Work |
+|---|---|
+| 21 Oct night | Validate session-test false alarms on 400 honest training-regime sessions; commit |
+| 21 Oct night | `src/main.py` entry point, GitHub Actions CI, static README figures |
+| 22 Oct morning | **Monitoring-layer prototype**: vendor-neutral telemetry format (per link and window: key and reference counts); streaming `nirikshak.monitor` (rolling reference window, session test, alarm log); network-operations view with several simulated links plus one link replaying real IBM sessions. All simulated links labelled as such, no operator branding |
+| 22 Oct, through the day | Drift batches every few hours (own and teammates' accounts); second backend (`ibm_fez` or `ibm_marrakesh`) |
+| 22 Oct afternoon | Dashboard redesign; optional decoy-state BB84 with simulated photon-number-splitting attack |
+| 22 Oct evening | Slides, demo script, recorded demo video |
+| 23 Oct until 12:00 | Code freeze, final README and portal summary, demo rehearsal; 12:00-15:00 buffer |
 
 ### Hardware budget rules
 

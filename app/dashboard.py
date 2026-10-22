@@ -13,7 +13,8 @@ import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
 
-from nirikshak.detectors import QBERThreshold, ReferenceConformal
+from nirikshak.detectors import QBERThreshold, ReferenceConformal, SessionTest
+from nirikshak.protocol import bb84_key_rate
 from nirikshak.noise import simple_noise
 from nirikshak.session import SessionSpec, simulate_session
 from nirikshak.sim import make_simulator
@@ -172,6 +173,17 @@ with tab_hw:
     st.plotly_chart(timeline(key, "Every key block in the batch, in session order"), key="tl_hw")
     st.markdown("**Detection by condition** (honest row = false alarms)")
     st.plotly_chart(detection_bars(key), key="bars_hw")
+    st.markdown("**Session verdicts**: one permutation test per session, key blocks vs that session's "
+                "reference blocks. Key rate: asymptotic BB84 secret bits per sifted bit (0 = protocol aborts).")
+    verdicts = SessionTest(ALPHA).predict_table(batches[choice])
+    verdicts["Session"] = [condition(a, f, s) for a, f, s in zip(verdicts.attack, verdicts.attacked_fraction, verdicts.strength)]
+    verdicts["Key QBER"] = verdicts.key_mean.map("{:.1%}".format)
+    verdicts["Reference QBER"] = verdicts.ref_mean.map("{:.1%}".format)
+    verdicts["Key rate"] = bb84_key_rate(verdicts.key_mean.to_numpy()).round(2)
+    verdicts["p-value"] = verdicts.p_value.map("{:.4f}".format)
+    verdicts["Verdict"] = verdicts.alarm.map({True: "attack", False: "clean"})
+    st.dataframe(verdicts[["Session", "Key QBER", "Reference QBER", "Key rate", "p-value", "Verdict"]],
+                 width="stretch", hide_index=True)
     with st.expander("Table view"):
         st.dataframe(key.groupby(["session_idx", "condition"]).agg(
             blocks=("qber", "size"), mean_qber=("qber", "mean"), threshold=("threshold", "first"),

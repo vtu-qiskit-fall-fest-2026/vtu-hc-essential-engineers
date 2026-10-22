@@ -3,6 +3,7 @@
     python scripts/make_sim_dataset.py                       # all regimes
     python scripts/make_sim_dataset.py --regimes train drift  # skip the slow FakeKingston regime
     python scripts/make_sim_dataset.py --regimes train --seed 1 --suffix _test   # independent test set
+    python scripts/make_sim_dataset.py --regimes drift --seed 2 --honest-only 40 --suffix _honest  # false-alarm check
 
 Regimes (one noise draw per session; the device "drifts" between sessions):
     train     readout 1-2%, symmetric, low gate noise: the clean world detectors are trained in
@@ -23,7 +24,7 @@ import pandas as pd
 
 from nirikshak.conditions import standard_conditions
 from nirikshak.noise import simple_noise
-from nirikshak.session import simulate_session
+from nirikshak.session import SessionSpec, simulate_session
 from nirikshak.sim import make_simulator
 
 OUT = Path(__file__).resolve().parents[1] / "data" / "sim"
@@ -49,8 +50,12 @@ def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--regimes", nargs="*", default=list(REPEATS), choices=list(REPEATS))
     ap.add_argument("--seed", type=int, default=0)
+    ap.add_argument("--honest-only", type=int, default=0, metavar="N",
+                    help="N honest sessions per repeat instead of the standard conditions (validation)")
     ap.add_argument("--suffix", default="", help="output name suffix, e.g. _test -> train_test.parquet")
     args = ap.parse_args()
+    if args.honest_only > 100:
+        ap.error("--honest-only is limited to 100 (seeds are spaced 100 apart per repeat)")
     OUT.mkdir(parents=True, exist_ok=True)
 
     for regime in args.regimes:
@@ -59,7 +64,9 @@ def main() -> None:
         tables, t0 = [], time.time()
         for rep in range(REPEATS[regime]):
             seed0 = args.seed * 1_000_000 + r_idx * 10_000 + rep * 100
-            for spec in standard_conditions(seed0=seed0):
+            specs = ([SessionSpec(seed=seed0 + i) for i in range(args.honest_only)] if args.honest_only
+                     else standard_conditions(seed0=seed0))
+            for spec in specs:
                 backend, noise = backend_for(regime, rng)
                 tables.append(simulate_session(spec, backend=backend, session_id=f"{regime}{args.suffix}:{spec.seed}",
                                                regime=regime, backend_name=backend.name, **noise))
