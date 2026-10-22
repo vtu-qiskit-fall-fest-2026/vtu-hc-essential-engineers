@@ -4,8 +4,9 @@
 2. Stress test from the committed datasets (results/stress_test.md).
 3. Scorecard with session verdicts, key rates and confidence intervals (results/scorecard.md).
 4. README figures (results/figures/*.png).
+5. JSON for the web frontend (web/src/results/).
 
-    python -m src.main             # steps 1-4, a few minutes, no IBM account needed
+    python -m src.main             # steps 1-5, a few minutes, no IBM account needed
     python -m src.main --demo      # step 1 only
     python -m src.main --regenerate  # also regenerate the simulated datasets first (about 25 min)
 
@@ -77,7 +78,9 @@ def main() -> None:
     run_script("scorecard.py")
     print("\n== 4. Figures -> results/figures/")
     run_script("figures.py")
-    print(f"\nDone in {time.time() - t0:.0f} s. Dashboard: python -m nirikshak.dashboard")
+    print("\n== 5. Web frontend data -> web/src/results/ (simulator grid: scripts/export_web.py --sim)")
+    run_script("export_web.py")
+    print(f"\nDone in {time.time() - t0:.0f} s. Web app: cd web && npm install && npm run dev")
 
 
 if __name__ == "__main__":

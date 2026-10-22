@@ -165,7 +165,7 @@ flowchart LR
 | ML | scikit-learn 1.9.1, XGBoost 3.4.1 |
 | Detectors | 11% QBER rule, sim-calibrated threshold, Random Forest, XGBoost, Nirikshak (per-session conformal) |
 | Statistics | Split-conformal thresholds, permutation test (session verdict), Clopper-Pearson intervals (SciPy) |
-| Frontend | Streamlit 1.66.0, Plotly; matplotlib for README figures |
+| Frontend | React 19 + TypeScript (Vite), hand-built SVG charts, GitHub Pages; Streamlit 1.66.0 analysis dashboard; matplotlib for README figures |
 | Testing | pytest, GitHub Actions (`.github/workflows/tests.yml`) |
 | Version control | Git + GitHub |
 
@@ -196,7 +196,8 @@ vtu-hc-essential-engineers/
 │   ├── conditions.py        # standard attack conditions (simulation and hardware)
 │   ├── sim.py               # Aer runner (same Sampler V2 interface as hardware)
 │   └── dashboard.py         # dashboard launcher (python -m nirikshak.dashboard)
-├── app/dashboard.py         # Streamlit dashboard: hardware results, stress test, simulator
+├── web/                     # React frontend (results bundled from web/src/results/)
+├── app/dashboard.py         # Streamlit analysis dashboard
 ├── scripts/
 │   ├── check_ibm.py         # account check (free, submits no jobs)
 │   ├── hw_smoke.py          # small hardware test (dry run free; --submit uses quantum time)
@@ -205,6 +206,7 @@ vtu-hc-essential-engineers/
 │   ├── stress_test.py       # sim-trained detectors vs Nirikshak on all test sets
 │   ├── scorecard.py         # session verdicts, key rates, 95% intervals
 │   ├── figures.py           # README figures (results/figures/)
+│   ├── export_web.py        # results as JSON for the web frontend
 │   └── hardware_lessons.py  # per-batch honest / touched / untouched QBER from raw bits
 ├── results/                 # scorecard, stress test, sessions.csv, hardware_lessons.csv, figures/
 ├── tests/                   # pytest suite
@@ -258,13 +260,26 @@ In Jupyter, set that variable before starting the notebook server instead.
 python -m src.main --demo         # 1 minute: honest vs attacked session on the simulator
 python -m src.main                # demo + stress test + scorecard + figures, a few minutes
 python -m pytest -q               # tests
-python -m nirikshak.dashboard     # Streamlit dashboard
+python -m nirikshak.dashboard     # Streamlit analysis dashboard
 python -m nirikshak.monitor --demo demo.jsonl && python -m nirikshak.monitor demo.jsonl  # network monitor
 ```
 
 No IBM account is needed: the hardware results are committed in `data/hardware/`.
 
-### 4. Optional: IBM Quantum hardware
+### 4. The web app
+
+```bash
+cd web
+npm install
+npm run dev                       # http://localhost:5173
+```
+
+Pages: hardware results, network monitor (replays a day of link verdicts), stress test, and how it
+works with a simulator. Needs Node 20 or newer. The data comes from `python scripts/export_web.py`
+(run by `python -m src.main`; add `--sim` to regenerate the simulator grid). On every push to
+`main` that touches `web/`, `.github/workflows/pages.yml` publishes it to GitHub Pages.
+
+### 5. Optional: IBM Quantum hardware
 
 Put your own API key in `.env` (git-ignored; never commit or share it):
 

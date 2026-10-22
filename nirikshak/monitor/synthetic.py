@@ -105,7 +105,7 @@ def demo_network(hw_dir: str | Path | None = None, hours: int = 24, seed: int = 
         replay = hardware_replay(hw_dir)
         if replay:
             records += replay
-            links.append({"link_id": "L5", "description": "replay of real ibm_kingston sessions, one per hour "
-                          "(honest and attacked, attacks run by us)", "source": "IBM hardware"})
+            links.append({"link_id": "L5", "description": "real ibm_kingston sessions replayed, one per hour",
+                          "source": "IBM hardware"})
     records.sort(key=lambda r: pd.Timestamp(r.t))
     return records, pd.DataFrame(links)
