@@ -1,7 +1,7 @@
 """Nirikshak dashboard. Run: python -m nirikshak.dashboard
 
-Tabs: real IBM hardware results, the sim-to-real stress test, a live simulator, and the hardware
-lessons. Reads the committed datasets in data/hardware, data/sim and results/.
+Tabs: real IBM hardware results, the sim-to-real stress test, a live simulator, the hardware
+lessons, and a network monitor prototype. Reads the committed datasets in data/hardware, data/sim and results/.
 """
 
 from __future__ import annotations
@@ -14,6 +14,8 @@ import plotly.graph_objects as go
 import streamlit as st
 
 from nirikshak.detectors import QBERThreshold, ReferenceConformal, SessionTest
+from nirikshak.monitor import NetworkMonitor
+from nirikshak.monitor.synthetic import default_scenarios, demo_network, hardware_replay_labels
 from nirikshak.protocol import bb84_key_rate
 from nirikshak.noise import simple_noise
 from nirikshak.session import SessionSpec, simulate_session
@@ -142,14 +144,72 @@ def worst_case_bars(stress: pd.DataFrame) -> go.Figure:
     return style(fig, height=320, bargap=0.45, showlegend=False)
 
 
+@st.cache_data
+def run_network(seed: int, alpha: float) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Verdict per link and hourly window, with what really happened in that window."""
+    hw_dir = ROOT / "data" / "hardware"
+    records, links = demo_network(hw_dir, seed=seed)
+    v = NetworkMonitor(alpha=alpha).run(records).verdict_table()
+    v["window"] = v.groupby("link_id").cumcount()
+    starts = {sc.link_id: sc.attack_start_h for sc in default_scenarios()}
+    labels = hardware_replay_labels(hw_dir)
+    truth = []
+    for link, w in zip(v.link_id, v.window):
+        if link in starts:
+            truth.append("attacked" if starts[link] is not None and w >= starts[link] else "honest")
+        else:
+            r = labels.iloc[w]
+            truth.append("honest" if r.attack == "none" else condition(r.attack, r.attacked_fraction, r.strength))
+    v["truth"] = truth
+    v["start"] = pd.to_datetime(v["t_start"]).dt.floor("h")
+    return v, links
+
+
+def network_grid(v: pd.DataFrame) -> go.Figure:
+    links = sorted(v.link_id.unique(), reverse=True)
+    starts = sorted(v.start.unique())
+    z = np.full((len(links), len(starts)), np.nan)
+    text = np.full(z.shape, "", dtype=object)
+    for r in v.itertuples():
+        i, j = links.index(r.link_id), starts.index(r.start)
+        z[i, j] = float(r.alarm)
+        text[i, j] = (f"{r.link_id}, {pd.Timestamp(r.start):%d %b %H:%M}<br>verdict: {'ALARM' if r.alarm else 'clean'} "
+                      f"(p = {r.p_value:.4f})<br>key QBER {r.key_qber:.2%}, reference {r.ref_qber:.2%}"
+                      f"<br>actually: {r.truth}")
+    fig = go.Figure(go.Heatmap(z=z, x=[pd.Timestamp(t) for t in starts], y=links, text=text,
+                               hovertemplate="%{text}<extra></extra>", xgap=2, ygap=2, showscale=False,
+                               colorscale=[[0, GRID], [1, ORANGE]], zmin=0, zmax=1))
+    truth = v[v.truth != "honest"]
+    fig.add_trace(go.Scatter(x=truth.start, y=truth.link_id, mode="markers", name="window really attacked",
+                             marker=dict(symbol="x-thin", size=8, line=dict(width=2, color=SURFACE if DARK else "#1f1f1e")),
+                             hoverinfo="skip"))
+    return style(fig, height=280, showlegend=True, plot_bgcolor="rgba(0,0,0,0)")
+
+
+def link_detail(lv: pd.DataFrame) -> tuple[go.Figure, go.Figure]:
+    q = go.Figure()
+    q.add_trace(go.Scatter(x=lv.start, y=lv.key_qber, name="key blocks", mode="lines+markers",
+                           line=dict(color=BLUE, width=2), marker=dict(size=8)))
+    q.add_trace(go.Scatter(x=lv.start, y=lv.ref_qber, name="reference blocks", mode="lines+markers",
+                           line=dict(color=GRAY, width=2), marker=dict(size=8)))
+    q.update_yaxes(tickformat=".1%", rangemode="tozero", title="mean QBER per window")
+    b = go.Figure()
+    for col, name, color in (("blocks_flagged", "Nirikshak (rolling reference)", BLUE),
+                             ("blocks_flagged_frozen", "threshold frozen at commissioning", ORANGE),
+                             ("blocks_flagged_11", "11% rule", GRAY)):
+        b.add_trace(go.Bar(x=lv.start, y=lv[col], name=name, marker_color=color))
+    b.update_yaxes(title="key blocks flagged (of 20)", range=[0, 20.5])
+    return style(q, height=300).update_layout(hovermode="x unified"), style(b, height=300, barmode="group", bargap=0.25)
+
+
 # ---------------------------------------------------------------- page
 
 st.title("Nirikshak")
 st.caption("Catching eavesdroppers on real quantum hardware. BB84 on IBM Quantum `ibm_kingston`; "
            f"every detector held to a {ALPHA:.0%} false-alarm budget.")
 
-tab_hw, tab_stress, tab_sim, tab_lessons = st.tabs(
-    ["Real hardware", "Stress test", "Simulator", "What hardware taught us"])
+tab_hw, tab_stress, tab_sim, tab_lessons, tab_net = st.tabs(
+    ["Real hardware", "Stress test", "Simulator", "What hardware taught us", "Network monitor"])
 
 with tab_hw:
     batches = load_hardware()
@@ -242,3 +302,48 @@ with tab_lessons:
                 "to 4% (phase errors).\n"
                 "- **Batch 3:** spin echo during the idle. Fair and low: untouched rounds match honest rounds.\n"
                 "- **Batches 4-5:** repeats, the second 21 hours later: honest QBER unchanged (1.75%, 1.8%).")
+
+
+with tab_net:
+    st.markdown("**Prototype of Nirikshak as a monitoring layer for a QKD network.** Each link streams "
+                "telemetry (per block: sifted rounds and errors, for key rounds and for local reference "
+                "rounds). Every hour the monitor gives each link a verdict with a 5% false-alarm budget.")
+    st.caption("Links L1-L4 are simulated (binomial error counts with the drift and attacks listed). "
+               "L5 replays real ibm_kingston sessions, one per hour, including attacks we ran. "
+               "Not real operator data; no operator or network is represented.")
+    seed = st.number_input("Simulation seed", 0, 999, 0, help="Re-draws the simulated links L1-L4")
+    v, links = run_network(int(seed), ALPHA)
+    status = v.sort_values("start").groupby("link_id").tail(1).set_index("link_id")
+    cols = st.columns(len(links))
+    for c, link in zip(cols, links.itertuples()):
+        last = status.loc[link.link_id]
+        lv = v[v.link_id == link.link_id]
+        c.metric(f"{link.link_id}: {'ALARM' if last.alarm else 'ok'}", f"{int(lv.alarm.sum())} of {len(lv)} windows",
+                 help=link.description)
+        c.caption(f"{link.description} ({link.source})")
+    st.plotly_chart(network_grid(v), width="stretch")
+    honest = v[v.truth == "honest"]
+    attacked = v[v.truth != "honest"]
+    a, b, c = st.columns(3)
+    a.metric("Honest windows flagged", f"{honest.alarm.mean():.0%}", help=f"{int(honest.alarm.sum())} of {len(honest)}")
+    b.metric("Attacked windows flagged", f"{attacked.alarm.mean():.0%}", help=f"{int(attacked.alarm.sum())} of {len(attacked)}")
+    c.metric("Attacked windows over 11% QBER", f"{(attacked.key_qber > 0.11).mean():.0%}")
+
+    pick = st.selectbox("Link detail", list(links.link_id), index=1,
+                        format_func=lambda l: f"{l}: {links.set_index('link_id').loc[l, 'description']}")
+    q, bars = link_detail(v[v.link_id == pick])
+    left, right = st.columns(2)
+    left.plotly_chart(q, width="stretch")
+    right.plotly_chart(bars, width="stretch")
+    st.markdown("A threshold frozen at commissioning drowns in alarms when the link drifts (L2); "
+                "Nirikshak re-calibrates on the reference rounds every window, so drift alone stays near 1 "
+                "flagged block in 20 while a tap on 1 of 16 rounds (L3) is flagged every hour.")
+    st.subheader("Alarm log")
+    log = v[v.alarm].sort_values("start", ascending=False)
+    st.dataframe(log.assign(**{"window start": log.start.dt.strftime("%d %b %H:%M"),
+                               "key QBER": log.key_qber.map("{:.2%}".format),
+                               "reference QBER": log.ref_qber.map("{:.2%}".format),
+                               "p-value": log.p_value.map("{:.4f}".format)})
+                 [["link_id", "window start", "key QBER", "reference QBER", "p-value", "blocks_flagged", "truth"]]
+                 .rename(columns={"link_id": "Link", "blocks_flagged": "Blocks flagged", "truth": "Actually"}),
+                 width="stretch", hide_index=True)
