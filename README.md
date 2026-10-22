@@ -8,9 +8,11 @@
 A hardware-in-the-loop stress test and drift-robust eavesdropper detector for BB84
 Quantum Key Distribution (QKD), built with Qiskit and run on IBM Quantum hardware.
 
-**Result on `ibm_kingston`:** Nirikshak caught an eavesdropper touching 2 of 16 rounds in 95%
-of blocks with 0% false alarms, where the textbook 11% rule caught none. Detectors trained in
-simulation reached 82-88% false alarms once noise shifted, including on real hardware.
+**Result on `ibm_kingston`:** across three batches 22 hours apart, Nirikshak flagged all 21
+attacked sessions (p ≤ 0.0002), including an eavesdropper touching 1 of 16 rounds, and none of
+the 9 honest ones. The textbook 11% rule caught only the largest attack, and BB84 would have kept
+producing keys through the rest. Detectors trained in simulation reached 82-88% false alarms
+once noise shifted, including on real hardware.
 
 </div>
 
@@ -100,7 +102,8 @@ live dashboard.
 **Key idea:** In every run, a separate honest calibration circuit on the same qubits (no
 channel, so Eve cannot touch it) measures today's noise. The alarm threshold is set from it
 by split-conformal calibration, so the false-alarm rate is stated in advance in every session,
-drift or not, and small attacks are flagged far below the 11% limit.
+drift or not, and small attacks are flagged far below the 11% limit. Per session, a permutation test of key
+blocks against reference blocks gives one verdict (attack or clean) with a p-value.
 
 **Why this works:**
 
@@ -146,8 +149,8 @@ flowchart LR
    gets the same slot duration with a spin echo on idle qubits; each job stores the layout
    and a calibration snapshot.
 4. **Post-processing:** sifting, QBER per basis, basis asymmetry, per-qubit error rates.
-5. **Output:** alarms from each detector, scored as false-alarm rate and miss rate, shown
-   in a Streamlit dashboard.
+5. **Output:** per-session verdicts and p-values, per-block alarms, BB84 key rates, scored as
+   false-alarm and detection rates with 95% intervals, shown in a Streamlit dashboard.
 
 ---
 
@@ -161,8 +164,9 @@ flowchart LR
 | Hardware | IBM Quantum Open Plan, `ibm_kingston` (Heron r2) |
 | ML | scikit-learn 1.9.1, XGBoost 3.4.1 |
 | Detectors | 11% QBER rule, sim-calibrated threshold, Random Forest, XGBoost, Nirikshak (per-session conformal) |
-| Frontend | Streamlit 1.66.0 |
-| Testing | pytest |
+| Statistics | Split-conformal thresholds, permutation test (session verdict), Clopper-Pearson intervals (SciPy) |
+| Frontend | Streamlit 1.66.0, Plotly; matplotlib for README figures |
+| Testing | pytest, GitHub Actions (`.github/workflows/tests.yml`) |
 | Version control | Git + GitHub |
 
 ---
@@ -177,6 +181,8 @@ vtu-hc-essential-engineers/
 ├── requirements.txt         # pinned direct dependencies (pip install -r)
 ├── requirements.lock        # full tested environment (Linux, Python 3.12)
 ├── .env.example             # IBM credential template (copy to .env)
+├── .github/workflows/       # CI: pytest on every push
+├── src/main.py              # end-to-end entry point (python -m src.main)
 ├── nirikshak/
 │   ├── protocol/            # BB84 parameterized templates, sifting, QBER
 │   ├── attacks/             # intercept-resend (full/partial), entangling probe
@@ -196,11 +202,13 @@ vtu-hc-essential-engineers/
 │   ├── make_sim_dataset.py  # simulated block dataset (train, drift, kingston regimes)
 │   ├── collect.py           # hardware batch: plan, --submit, --fetch
 │   ├── stress_test.py       # sim-trained detectors vs Nirikshak on all test sets
+│   ├── scorecard.py         # session verdicts, key rates, 95% intervals
+│   ├── figures.py           # README figures (results/figures/)
 │   └── hardware_lessons.py  # per-batch honest / touched / untouched QBER from raw bits
-├── results/                 # stress_test.md / .csv, hardware_lessons.csv
+├── results/                 # scorecard, stress test, sessions.csv, hardware_lessons.csv, figures/
 ├── tests/                   # pytest suite
 ├── data/hardware/           # hardware block datasets (one parquet per job)
-├── data/sim/                # simulated block datasets (train, train_test, drift, kingston)
+├── data/sim/                # simulated block datasets (train, test, drift, kingston, honest-only)
 ├── data/raw/                # raw bits and job metadata (git-ignored)
 ├── notebooks/               # experiments and figures
 └── PROJECT.md               # full design document
@@ -243,12 +251,16 @@ handles this automatically by restarting the command once with
 `GLIBC_TUNABLES=glibc.rtld.optional_static_tls=4096` set (see `nirikshak/_runtime.py`).
 In Jupyter, set that variable before starting the notebook server instead.
 
-### 3. Run the tests and the dashboard
+### 3. Run it
 
 ```bash
-python -m pytest -q
-python -m nirikshak.dashboard      # opens the Streamlit dashboard
+python -m src.main --demo         # 1 minute: honest vs attacked session on the simulator
+python -m src.main                # demo + stress test + scorecard + figures, a few minutes
+python -m pytest -q               # tests
+python -m nirikshak.dashboard     # Streamlit dashboard
 ```
+
+No IBM account is needed: the hardware results are committed in `data/hardware/`.
 
 ### 4. Optional: IBM Quantum hardware
 
@@ -330,73 +342,110 @@ git branch -d feature/my-task
 
 ## Results
 
-All numbers below state the backend that produced them. Alarm rates are per block
-(8 random settings x 8 shots x 16 rounds); false-alarm target alpha = 5%.
+All numbers state the backend that produced them; brackets are exact 95% intervals
+(Clopper-Pearson). False-alarm budget alpha = 5%. Full tables: [`results/scorecard.md`](results/scorecard.md),
+[`results/stress_test.md`](results/stress_test.md), per session: [`results/sessions.csv`](results/sessions.csv).
 
-### Real hardware: `ibm_kingston`, batch 3 (job `dbcdsck24mrc73cjek9g`, 21 Oct 2026)
+Nirikshak gives two outputs per session (20 key blocks + 20 reference blocks):
 
-Timing matched with spin echo. Honest QBER 1.7%; rounds Eve did not touch 1.6-1.75%
-(same as honest); rounds she did touch 26-28% (theory: 25% plus noise).
+- **Session verdict (the decision):** a one-sided permutation test, are the key blocks noisier
+  than this session's reference blocks? At most 5% of honest sessions are flagged.
+- **Block alarms (where to look):** each key block is compared with a threshold set from the
+  session's reference blocks (split-conformal). About 5% of honest blocks on average, more in
+  some sessions, since the threshold rests on 20 reference blocks.
 
-| Condition | Key QBER | Nirikshak | 11% rule (classical baseline) |
-| :--- | :-: | :-: | :-: |
-| Honest, false alarms (3 sessions) | 1.7-1.8% | **0%** | 0% |
-| Intercept-resend, 1 of 16 rounds | 3.1% | **60%** | 0% |
-| Intercept-resend, 2 of 16 rounds | 4.9% | **95%** | 0% |
-| Intercept-resend, 4 of 16 rounds | 7.8% | **100%** | 5% |
-| Intercept-resend, 8 of 16 rounds | 15.1% | **100%** | 95% |
-| Entangling probe (3 settings) | 3.8-5.5% | **50-100%** | 0% |
+### Real hardware: `ibm_kingston`, batches 3-5 (spin echo, 21 Oct 21:15 to 22 Oct 19:00)
+
+![Blocks flagged on ibm_kingston](results/figures/detection.png)
+
+| Condition (3 sessions each) | Key QBER | BB84 key rate | Session verdict | Nirikshak, per block | 11% rule, per block |
+| :--- | :-: | :-: | :-: | :-: | :-: |
+| Honest | 1.7-1.9% | 0.73-0.76 | **0 of 9 flagged** | 4% (2%-9%) | 0% |
+| Intercept-resend, 1 of 16 rounds | 3.0-3.2% | 0.59-0.61 | **3 of 3** | 47% (34%-60%) | 0% |
+| Intercept-resend, 2 of 16 rounds | 4.8-5.1% | 0.42-0.45 | **3 of 3** | 90% (79%-96%) | 0% |
+| Intercept-resend, 4 of 16 rounds | 7.8-8.5% | 0.16-0.21 | **3 of 3** | 100% (94%-100%) | 12% |
+| Intercept-resend, 8 of 16 rounds | 14.2-15.4% | 0 (abort) | **3 of 3** | 100% (94%-100%) | 95% |
+| Entangling probe (3 settings) | 3.7-5.5% | 0.39-0.55 | **9 of 9** | 62-98% | 0% |
+
+- All 21 attacked sessions: 100% flagged (84%-100%), every p-value ≤ 0.0002. Honest sessions:
+  0 of 9 (0%-34%; nine sessions cannot pin the rate down further, see simulation below).
+- Key rate is the asymptotic BB84 rate `1 - 2h(QBER)` per sifted bit. For every attack except
+  8 of 16 it stays positive: the protocol would keep making keys and never report the
+  eavesdropper. That is the gap Nirikshak fills.
+
+![Honest QBER over time](results/figures/drift.png)
+
+Honest QBER stayed at 1.7-1.9% over 22 hours, and in every session the reference rounds sat
+within 0.2 points of the key rounds, which is what lets them calibrate the alarm.
+
+### Simulation: does the session verdict keep its 5% budget?
+
+| Simulated condition | Honest sessions | Flagged |
+| :--- | :-: | :-: |
+| Training noise | 400 | 5% (3%-8%) |
+| Drifted noise | 200 | 6% (4%-11%) |
 
 ### Stress test: trained in simulation, tested under shift
 
-Every detector except Nirikshak is trained or calibrated on simulated data
-(`data/sim/train.parquet`) for 5% false alarms. Full tables: [`results/stress_test.md`](results/stress_test.md).
+![Worst-case false alarms](results/figures/stress_test.png)
 
-| Detector | False alarms, worst test set | Where |
+Every detector except Nirikshak is trained or calibrated on simulated data
+(`data/sim/train.parquet`) for 5% false alarms per block, then tested on drifted simulation, a
+Kingston noise snapshot and four hardware batches.
+
+| Detector | False alarms per block, worst test set | Where |
 | :--- | :-: | :--- |
 | Sim-calibrated QBER threshold | 88% | drifted simulation |
 | Random Forest (sim-trained) | 87% | real hardware, batch 2 |
 | XGBoost (sim-trained) | 88% | real hardware, batch 2 |
 | XGBoost + reference features | 25% | real hardware, batch 2 |
-| **Nirikshak** | **8%** (2-8% on all six sets) | Kingston snapshot simulation |
+| **Nirikshak** (block alarms) | **13%** (0-8% on the other sets) | real hardware, batch 5 |
 
-- When hardware noise happens to match the simulation (batch 3, 1.7%), the sim-trained
-  detectors work and detect slightly more than Nirikshak (entangling probe 92-97% vs 83%).
+- When hardware noise happens to match the simulation (batches 3-5, 1.7%), the sim-trained
+  detectors work and detect slightly more per block than Nirikshak.
 - When it does not (batch 2, 4% noise floor; drifted simulation), they flag 82-88% of honest
   blocks. In the Kingston snapshot they instead miss small attacks (22-28% vs 78%).
-- Nirikshak keeps its false-alarm budget everywhere; the cost is a little sensitivity when
-  conditions happen to match training. Reference rounds also help ML: XGBoost with
-  reference features drops from 88% to 25% worst-case false alarms.
+- Nirikshak's worst case is batch 5: 8 of 60 honest blocks, spread over 3 sessions whose
+  session verdicts were all clean. Reference rounds also help ML: XGBoost with reference
+  features drops from 88% to 25% worst-case false alarms.
 
 ### What real hardware taught us
 
 | Batch (`ibm_kingston`) | Timing between preparation and measurement | Honest QBER | Rounds Eve did not touch |
 | :--- | :--- | :-: | :-: |
-| 1 (`dbcdge9gv2cc73ea4ne0`) | not matched | 0.8% | 2.6-6.4%: they idled during her measurements |
+| 1 (`dbcdge9gv2cc73ea4ne0`) | not matched | 0.7% | 2.6-6.4%: they idled during her measurements |
 | 2 (`dbcdpek24mrc73cjedeg`) | matched, plain idle | 4.2% (X basis 7%) | 4.4-6.3%: fair, but idling dephases |
 | 3 (`dbcdsck24mrc73cjek9g`) | matched, spin echo | 1.7% | 1.6-1.75%: fair and low |
+| 4 (`dbce8c0c77vs738641j0`) | matched, spin echo | 1.75% | 1.8-1.9% |
+| 5 (`dbd0vo424mrc73cki1l0`) | matched, spin echo, 21 h later | 1.8% | 1.6-2.5% |
 
 Batch 1's detection rates (100% everywhere) were inflated by this artifact and are not
-claimed. A qubit-0 readout failure in an earlier smoke test that IBM's calibration did not
-predict is why qubits are picked from live calibration and per-qubit errors are recorded.
+claimed; batches 1-2 are excluded from all pooled hardware numbers. A qubit-0 readout failure
+in an earlier smoke test that IBM's calibration did not predict is why qubits are picked from
+live calibration and per-qubit errors are recorded.
 
 ### Limitations
 
-- Three batches on one backend in one evening; drift over hours is still to be measured.
-- 16 rounds per shot, so attacked fractions come in steps of 1/16; shots within a binding
-  share random choices (blocks pool 8 bindings).
-- 20 reference blocks per session: the false-alarm rate holds on average, but individual
-  sessions vary (up to 15% in one hardware session).
-- Optical attacks (photon-number splitting, detector blinding) are not run on hardware.
+- One backend so far, three usable batches over 22 hours, 3 sessions per condition per batch.
+  Nine honest hardware sessions bound the session false-alarm rate only to 0-34%; the 5% claim
+  rests on 600 simulated honest sessions.
+- Block alarms vary between sessions (up to 15% of one honest hardware session's blocks), because
+  each session's threshold comes from 20 reference blocks. The session verdict does not have
+  this problem; block intervals treat blocks as independent and are somewhat too narrow.
+- 16 rounds per shot, so attacked fractions come in steps of 1/16; shots within a binding share
+  random choices (blocks pool 8 bindings).
+- Key rates are asymptotic (no finite-key corrections). Optical attacks (photon-number
+  splitting, detector blinding) are not run on hardware.
 
 ---
 
 ## Reproduce the Results
 
-The simulated and hardware datasets are committed, so the stress test runs straight away:
+The simulated and hardware datasets are committed, so everything below the hardware step runs
+straight away:
 
 ```bash
-python scripts/stress_test.py                                        # results/stress_test.md
+python -m src.main                  # stress test, scorecard, figures (results/)
 ```
 
 To regenerate the simulated datasets (about 25 minutes):
@@ -404,14 +453,16 @@ To regenerate the simulated datasets (about 25 minutes):
 ```bash
 python scripts/make_sim_dataset.py                                   # data/sim/
 python scripts/make_sim_dataset.py --regimes train --seed 1 --suffix _test
+# or all of them: python -m src.main --regenerate
 ```
 
 Hardware batches (each about 10 s of quantum time; plan is free):
 
 ```bash
-python scripts/collect.py --batch 4                 # plan only
-python scripts/collect.py --batch 4 --submit        # submit, returns immediately
-python scripts/collect.py --fetch <job_id>          # download into data/hardware/
+python scripts/collect.py --batch 7                         # plan only (default backend from .env)
+python scripts/collect.py --batch 7 --backend ibm_fez --submit  # submit, returns immediately
+python scripts/collect.py --fetch <job_id>                  # download into data/hardware/
+python scripts/hardware_lessons.py                          # needs data/raw/ from the collecting machine
 ```
 
 ---
@@ -422,7 +473,7 @@ The IBM Quantum Open Plan gives 10 minutes (600 s) of quantum time per rolling 2
 window per account; check yours with `get_service().usage()`. Session mode is not
 available; use job or batch mode. At most 3 jobs can be queued or running at once.
 IBM's quick usage estimate is `2 + 0.00035 x executions` seconds per job; a 10-session batch
-(25,600 executions) used 10 s. Used so far: 33 s of 600 on one account. Test every
+(25,600 executions) used 10 s. Used so far: 53 s of 600 on one account. Test every
 circuit on the simulator first, and combine circuits into few large jobs.
 
 ---
