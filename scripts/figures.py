@@ -107,7 +107,7 @@ def drift() -> None:
     jobs = lessons[lessons["job_id"].isin(s["job_id"])].assign(t=lambda d: pd.to_datetime(d["submitted"]))
     jobs = jobs.sort_values("t").reset_index(drop=True)
 
-    fig, ax = plt.subplots(figsize=(7.2, 3.4))
+    fig, ax = plt.subplots(figsize=(max(7.2, 1.75 * len(jobs)), 3.4))
     kw = dict(s=48, edgecolors="white", linewidths=1.5, zorder=3)
     for i, job in jobs.iterrows():
         b = s[s["job_id"] == job["job_id"]]

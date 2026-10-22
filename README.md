@@ -11,9 +11,11 @@ Quantum Key Distribution (QKD), built with Qiskit and run on IBM Quantum hardwar
 **Result on `ibm_kingston`:** across three batches 22 hours apart, Nirikshak flagged all 21
 attacked sessions (p ≤ 0.0002), including an eavesdropper touching 1 of 16 rounds, and none of
 the 9 honest ones. The textbook 11% rule caught only the largest attack, and BB84 would have kept
-producing keys through the rest. On a second, noisier machine (`ibm_marrakesh`, honest QBER 3.6%)
-it caught all 7 attacks with no retuning, while detectors trained in simulation flagged 78-83% of
-honest blocks there, and up to 88% elsewhere once noise shifted.
+producing keys through the rest. On two more machines it caught every attack with no retuning:
+7 of 7 on the noisier `ibm_marrakesh` (honest QBER 3.6%), where detectors trained in simulation
+flagged 78-83% of honest blocks, and 7 of 7 on `ibm_fez` (2.0%). Across all three machines:
+35 of 35 attacked sessions flagged, 0 of 15 honest ones. Trained detectors flagged up to 88% of
+honest blocks once noise shifted.
 
 </div>
 
@@ -162,7 +164,7 @@ flowchart LR
 | Language | Python 3.11+ (developed on 3.12) |
 | Quantum SDK | Qiskit 2.6.0, Qiskit IBM Runtime 0.50.0 (Sampler V2, job mode) |
 | Simulation | Qiskit Aer 0.18.0 (matrix product state), `FakeKingston` noise |
-| Hardware | IBM Quantum Open Plan, `ibm_kingston` and `ibm_marrakesh` (Heron r2) |
+| Hardware | IBM Quantum Open Plan, `ibm_kingston`, `ibm_marrakesh` and `ibm_fez` (Heron r2) |
 | ML | scikit-learn 1.9.1, XGBoost 3.4.1 |
 | Detectors | 11% QBER rule, sim-calibrated threshold, Random Forest, XGBoost, Nirikshak (per-session conformal) |
 | Statistics | Split-conformal thresholds, permutation test (session verdict), Clopper-Pearson intervals (SciPy) |
@@ -420,6 +422,23 @@ The 1 of 16 attack shows why the session verdict is the decision: on a noisier m
 its 20 blocks crossed the block threshold, but pooling all 20 against the reference blocks still
 flagged the session.
 
+### Third machine: `ibm_fez`, batch 6 (job `dbd104pgv2cc738h5m80`, submitted 22 Oct 19:01, ran 23 Oct 01:16)
+
+Same circuits and settings, nothing retuned. Fez's noise floor (honest QBER 1.9-2.2%, reference
+rounds 1.8-2.0%) is close to kingston's.
+
+| Condition | Key QBER | BB84 key rate | Session verdict | Nirikshak, per block | 11% rule, per block |
+| :--- | :-: | :-: | :-: | :-: | :-: |
+| Honest (3 sessions) | 1.9-2.2% | 0.70-0.73 | **0 of 3 flagged** | 8% (3%-18%) | 0% |
+| Intercept-resend, 1 of 16 rounds | 3.2% | 0.59 | **attack**, p = 0.0004 | 35% | 0% |
+| Intercept-resend, 2 of 16 rounds | 5.2% | 0.41 | **attack** | 95% | 0% |
+| Intercept-resend, 4 of 16 rounds | 7.6% | 0.22 | **attack** | 100% | 5% |
+| Intercept-resend, 8 of 16 rounds | 13.5% | 0 (abort) | **attack** | 100% | 85% |
+| Entangling probe (3 settings) | 4.3-5.7% | 0.37-0.49 | **attack** (3 of 3) | 35-90% | 0% |
+
+Here the noise matches the simulation, so the sim-trained detectors also behave (5-10% honest
+blocks flagged); Nirikshak needed no such luck on any of the three machines.
+
 ### Simulation: does the session verdict keep its 5% budget?
 
 | Simulated condition | Honest sessions | Flagged |
@@ -433,7 +452,7 @@ flagged the session.
 
 Every detector except Nirikshak is trained or calibrated on simulated data
 (`data/sim/train.parquet`) for 5% false alarms per block, then tested on drifted simulation, a
-Kingston noise snapshot and five hardware batches on two machines.
+Kingston noise snapshot and six hardware batches on three machines.
 
 | Detector | False alarms per block, worst test set | Where |
 | :--- | :-: | :--- |
@@ -443,7 +462,7 @@ Kingston noise snapshot and five hardware batches on two machines.
 | XGBoost + reference features | 25% | real hardware, batch 2 |
 | **Nirikshak** (block alarms) | **13%** (0-8% on the other sets) | real hardware, batch 5 |
 
-- When hardware noise happens to match the simulation (batches 3-5, 1.7%), the sim-trained
+- When hardware noise happens to match the simulation (kingston batches 3-5, 1.7%; `ibm_fez`, 2.0%), the sim-trained
   detectors work and detect slightly more per block than Nirikshak.
 - When it does not, they flag most honest blocks: 78-83% on `ibm_marrakesh` (3.6% noise floor),
   82-88% on batch 2 (4%) and in drifted simulation. Nirikshak flags 3% on marrakesh. In the Kingston snapshot they instead miss small attacks (22-28% vs 78%).
@@ -460,6 +479,7 @@ Kingston noise snapshot and five hardware batches on two machines.
 | 3 (`dbcdsck24mrc73cjek9g`) | matched, spin echo | 1.7% | 1.6-1.75%: fair and low |
 | 4 (`dbce8c0c77vs738641j0`) | matched, spin echo | 1.75% | 1.8-1.9% |
 | 5 (`dbd0vo424mrc73cki1l0`) | matched, spin echo, 21 h later | 1.8% | 1.6-2.5% |
+| 6, `ibm_fez` (`dbd104pgv2cc738h5m80`) | matched, spin echo | 2.0% | 1.8-2.0% |
 | 7, `ibm_marrakesh` (`dbd3bts24mrc73cklb10`) | matched, spin echo | 3.6% | 3.6-4.5% |
 
 Batch 1's detection rates (100% everywhere) were inflated by this artifact and are not
@@ -495,9 +515,9 @@ operator integration.
 
 ### Limitations
 
-- Two backends: three usable `ibm_kingston` batches over 22 hours and one `ibm_marrakesh` batch,
-  3 sessions per condition per batch.
-  Nine honest hardware sessions bound the session false-alarm rate only to 0-34%; the 5% claim
+- Three backends: three usable `ibm_kingston` batches over 22 hours, one `ibm_marrakesh` and one
+  `ibm_fez` batch, 3 sessions per condition per batch.
+  Fifteen honest hardware sessions (all clean) bound the session false-alarm rate only to 0-22%; the 5% claim
   rests on 600 simulated honest sessions.
 - Block alarms vary between sessions (up to 15% of one honest hardware session's blocks), because
   each session's threshold comes from 20 reference blocks. The session verdict does not have
@@ -543,7 +563,7 @@ The IBM Quantum Open Plan gives 10 minutes (600 s) of quantum time per rolling 2
 window per account; check yours with `get_service().usage()`. Session mode is not
 available; use job or batch mode. At most 3 jobs can be queued or running at once.
 IBM's quick usage estimate is `2 + 0.00035 x executions` seconds per job; a 10-session batch
-(25,600 executions) used 10 s. Used so far: 63 s of 600 on one account. Test every
+(25,600 executions) used 10 s. Used so far: 73 s of 600 on one account. Test every
 circuit on the simulator first, and combine circuits into few large jobs.
 
 ---

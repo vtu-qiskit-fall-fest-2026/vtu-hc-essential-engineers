@@ -47,6 +47,12 @@ hardware: ibm_kingston batch 1 (timing NOT matched),intercept 8/16 rounds,0.95,1
 "hardware: ibm_kingston batch 5 (timing matched, spin echo)",intercept 2/16 rounds,0.0,0.9,0.9,0.9,0.9,0.9
 "hardware: ibm_kingston batch 5 (timing matched, spin echo)",intercept 4/16 rounds,0.2,1.0,1.0,1.0,1.0,1.0
 "hardware: ibm_kingston batch 5 (timing matched, spin echo)",intercept 8/16 rounds,1.0,1.0,1.0,1.0,1.0,1.0
+"hardware: ibm_fez batch 6 (timing matched, spin echo)",entangling probe (all),0.0,0.9666666666666667,0.95,0.9666666666666667,0.7666666666666667,0.6333333333333333
+"hardware: ibm_fez batch 6 (timing matched, spin echo)",honest (false alarms),0.0,0.1,0.05,0.05,0.06666666666666667,0.08333333333333333
+"hardware: ibm_fez batch 6 (timing matched, spin echo)",intercept 1/16 rounds,0.0,0.65,0.6,0.6,0.45,0.35
+"hardware: ibm_fez batch 6 (timing matched, spin echo)",intercept 2/16 rounds,0.0,0.95,0.95,0.95,0.95,0.95
+"hardware: ibm_fez batch 6 (timing matched, spin echo)",intercept 4/16 rounds,0.05,1.0,1.0,1.0,1.0,1.0
+"hardware: ibm_fez batch 6 (timing matched, spin echo)",intercept 8/16 rounds,0.85,1.0,1.0,1.0,1.0,1.0
 "hardware: ibm_marrakesh batch 7 (timing matched, spin echo)",entangling probe (all),0.35,1.0,1.0,1.0,1.0,0.9833333333333333
 "hardware: ibm_marrakesh batch 7 (timing matched, spin echo)",honest (false alarms),0.0,0.8333333333333334,0.8,0.7833333333333333,0.13333333333333333,0.03333333333333333
 "hardware: ibm_marrakesh batch 7 (timing matched, spin echo)",intercept 1/16 rounds,0.0,0.95,0.95,0.95,0.5,0.05

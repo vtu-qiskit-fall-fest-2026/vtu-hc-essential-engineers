@@ -84,6 +84,21 @@ Not used for claims: plain idle raised the noise floor (superseded by spin echo)
 | probe pi/4, 8/16 | 3.7% | 2.0% | 0.55 | 12/20 | 0/20 | 0.0001 | **attack** |
 | probe pi/4, 16/16 | 5.3% | 2.0% | 0.41 | 19/20 | 0/20 | 0.0001 | **attack** |
 
+### `ibm_fez` batch 6 (timing matched, spin echo, job `dbd104pgv2cc738h5m80`)
+
+| Session | Key QBER | Reference QBER | Key rate | Nirikshak blocks | 11% rule blocks | Session p-value | Session verdict |
+| :--- | :-: | :-: | :-: | :-: | :-: | :-: | :-: |
+| honest | 1.9% | 1.8% | 0.72 | 1/20 | 0/20 | 0.2814 | clean |
+| honest | 1.9% | 2.0% | 0.73 | 0/20 | 0/20 | 0.7557 | clean |
+| honest | 2.2% | 1.9% | 0.70 | 4/20 | 0/20 | 0.0972 | clean |
+| intercept 1/16 | 3.2% | 2.2% | 0.59 | 7/20 | 0/20 | 0.0004 | **attack** |
+| intercept 2/16 | 5.2% | 2.0% | 0.41 | 19/20 | 0/20 | 0.0001 | **attack** |
+| intercept 4/16 | 7.6% | 1.9% | 0.22 | 20/20 | 1/20 | 0.0001 | **attack** |
+| intercept 8/16 | 13.5% | 2.0% | 0.00 | 20/20 | 17/20 | 0.0001 | **attack** |
+| probe pi/8, 16/16 | 4.6% | 2.7% | 0.46 | 13/20 | 0/20 | 0.0001 | **attack** |
+| probe pi/4, 8/16 | 4.3% | 2.9% | 0.49 | 7/20 | 0/20 | 0.0001 | **attack** |
+| probe pi/4, 16/16 | 5.7% | 2.8% | 0.37 | 18/20 | 0/20 | 0.0001 | **attack** |
+
 ### `ibm_marrakesh` batch 7 (timing matched, spin echo, job `dbd3bts24mrc73cklb10`)
 
 | Session | Key QBER | Reference QBER | Key rate | Nirikshak blocks | 11% rule blocks | Session p-value | Session verdict |
@@ -98,6 +113,21 @@ Not used for claims: plain idle raised the noise floor (superseded by spin echo)
 | probe pi/8, 16/16 | 10.2% | 3.6% | 0.05 | 20/20 | 8/20 | 0.0001 | **attack** |
 | probe pi/4, 8/16 | 7.6% | 3.6% | 0.22 | 19/20 | 2/20 | 0.0001 | **attack** |
 | probe pi/4, 16/16 | 11.4% | 3.7% | 0.00 | 20/20 | 11/20 | 0.0001 | **attack** |
+
+## Real hardware, `ibm_fez`, pooled over 1 spin-echo batch(es)
+
+Honest row: false alarms. Other rows: detection.
+
+| Condition | Blocks | Nirikshak, per block | 11% rule, per block | Nirikshak, per session |
+| :--- | :-: | :-: | :-: | :-: |
+| honest | 60 | 8% (3%-18%) | 0% (0%-6%) | 0% (0%-71%) |
+| intercept 1/16 | 20 | 35% (15%-59%) | 0% (0%-17%) | 100% (3%-100%) |
+| intercept 2/16 | 20 | 95% (75%-100%) | 0% (0%-17%) | 100% (3%-100%) |
+| intercept 4/16 | 20 | 100% (83%-100%) | 5% (0%-25%) | 100% (3%-100%) |
+| intercept 8/16 | 20 | 100% (83%-100%) | 85% (62%-97%) | 100% (3%-100%) |
+| probe pi/8, 16/16 | 20 | 65% (41%-85%) | 0% (0%-17%) | 100% (3%-100%) |
+| probe pi/4, 8/16 | 20 | 35% (15%-59%) | 0% (0%-17%) | 100% (3%-100%) |
+| probe pi/4, 16/16 | 20 | 90% (68%-99%) | 0% (0%-17%) | 100% (3%-100%) |
 
 ## Real hardware, `ibm_kingston`, pooled over 3 spin-echo batch(es)
 
