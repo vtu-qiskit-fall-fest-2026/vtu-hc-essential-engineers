@@ -84,7 +84,22 @@ Not used for claims: plain idle raised the noise floor (superseded by spin echo)
 | probe pi/4, 8/16 | 3.7% | 2.0% | 0.55 | 12/20 | 0/20 | 0.0001 | **attack** |
 | probe pi/4, 16/16 | 5.3% | 2.0% | 0.41 | 19/20 | 0/20 | 0.0001 | **attack** |
 
-## Real hardware, pooled over 3 spin-echo batch(es)
+### `ibm_marrakesh` batch 7 (timing matched, spin echo, job `dbd3bts24mrc73cklb10`)
+
+| Session | Key QBER | Reference QBER | Key rate | Nirikshak blocks | 11% rule blocks | Session p-value | Session verdict |
+| :--- | :-: | :-: | :-: | :-: | :-: | :-: | :-: |
+| honest | 3.5% | 3.4% | 0.56 | 0/20 | 0/20 | 0.3206 | clean |
+| honest | 3.9% | 3.8% | 0.52 | 2/20 | 0/20 | 0.2837 | clean |
+| honest | 3.5% | 3.8% | 0.56 | 0/20 | 0/20 | 0.8839 | clean |
+| intercept 1/16 | 4.9% | 3.9% | 0.43 | 1/20 | 0/20 | 0.0035 | **attack** |
+| intercept 2/16 | 7.0% | 3.2% | 0.27 | 17/20 | 0/20 | 0.0001 | **attack** |
+| intercept 4/16 | 9.5% | 3.6% | 0.10 | 20/20 | 2/20 | 0.0001 | **attack** |
+| intercept 8/16 | 15.0% | 3.1% | 0.00 | 20/20 | 19/20 | 0.0001 | **attack** |
+| probe pi/8, 16/16 | 10.2% | 3.6% | 0.05 | 20/20 | 8/20 | 0.0001 | **attack** |
+| probe pi/4, 8/16 | 7.6% | 3.6% | 0.22 | 19/20 | 2/20 | 0.0001 | **attack** |
+| probe pi/4, 16/16 | 11.4% | 3.7% | 0.00 | 20/20 | 11/20 | 0.0001 | **attack** |
+
+## Real hardware, `ibm_kingston`, pooled over 3 spin-echo batch(es)
 
 Honest row: false alarms. Other rows: detection.
 
@@ -98,6 +113,21 @@ Honest row: false alarms. Other rows: detection.
 | probe pi/8, 16/16 | 60 | 83% (71%-92%) | 0% (0%-6%) | 100% (29%-100%) |
 | probe pi/4, 8/16 | 60 | 62% (48%-74%) | 0% (0%-6%) | 100% (29%-100%) |
 | probe pi/4, 16/16 | 60 | 98% (91%-100%) | 0% (0%-6%) | 100% (29%-100%) |
+
+## Real hardware, `ibm_marrakesh`, pooled over 1 spin-echo batch(es)
+
+Honest row: false alarms. Other rows: detection.
+
+| Condition | Blocks | Nirikshak, per block | 11% rule, per block | Nirikshak, per session |
+| :--- | :-: | :-: | :-: | :-: |
+| honest | 60 | 3% (0%-12%) | 0% (0%-6%) | 0% (0%-71%) |
+| intercept 1/16 | 20 | 5% (0%-25%) | 0% (0%-17%) | 100% (3%-100%) |
+| intercept 2/16 | 20 | 85% (62%-97%) | 0% (0%-17%) | 100% (3%-100%) |
+| intercept 4/16 | 20 | 100% (83%-100%) | 10% (1%-32%) | 100% (3%-100%) |
+| intercept 8/16 | 20 | 100% (83%-100%) | 95% (75%-100%) | 100% (3%-100%) |
+| probe pi/8, 16/16 | 20 | 100% (83%-100%) | 40% (19%-64%) | 100% (3%-100%) |
+| probe pi/4, 8/16 | 20 | 95% (75%-100%) | 10% (1%-32%) | 100% (3%-100%) |
+| probe pi/4, 16/16 | 20 | 100% (83%-100%) | 55% (32%-77%) | 100% (3%-100%) |
 
 ## Simulation, session verdict
 

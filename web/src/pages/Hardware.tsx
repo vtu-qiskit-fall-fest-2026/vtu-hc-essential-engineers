@@ -107,6 +107,50 @@ export default function Hardware() {
         </div>
       </section>
 
+      {Object.keys(d.pooled).filter((b) => b !== backend).map((other) => {
+        const po = d.pooled[other]
+        const ob = d.batches.filter((b) => b.backend === other && b.timing === 'echo')
+        return (
+          <section className="finding" key={other}>
+            <div className="gutter">
+              <h2 className="title">Same test, another machine</h2>
+              <dl className="facts">
+                <div><dt>Backend</dt><dd>{other} (Heron r2)</dd></div>
+                <div><dt>Batches</dt><dd>{ob.map((b) => `${b.batch}, ${fmtTime(b.submitted)}`).join('; ')}</dd></div>
+                <div><dt>IBM job</dt><dd>{ob.map((b) => b.job_id).join(', ')}</dd></div>
+                <div><dt>Honest QBER</dt><dd>{ob.map((b) => pct(b.honest_qber, 2)).join(', ')}</dd></div>
+              </dl>
+            </div>
+            <div className="body">
+              <p className="tally">
+                <span className="n key">{po.attacked_sessions.k} of {po.attacked_sessions.n}</span> attacked sessions
+                flagged and <span className="n">{po.honest_sessions.k} of {po.honest_sessions.n}</span> honest ones,
+                with nothing retuned for this machine: its own reference rounds set its own thresholds.
+              </p>
+              <div className="plate">
+                <div className="table-wrap">
+                  <table>
+                    <thead><tr><th>Session</th><th className="num">Key QBER</th><th className="num">Session verdicts</th>
+                      <th className="num">Nirikshak, blocks</th><th className="num">11% rule, blocks</th></tr></thead>
+                    <tbody>
+                      {po.conditions.map((c) => (
+                        <tr key={c.condition}>
+                          <td>{pretty(c.condition)}</td>
+                          <td className="num">{pctRange(c.key_qber[0], c.key_qber[1])}</td>
+                          <td className="num">{c.sessions.k} of {c.sessions.n} flagged</td>
+                          <td className="num">{pct(c.nirikshak.rate)}</td>
+                          <td className="num">{pct(c.rule.rate)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </section>
+        )
+      })}
+
       <section className="finding">
         <div className="gutter">
           <h2 className="title">Which blocks gave Eve away</h2>
