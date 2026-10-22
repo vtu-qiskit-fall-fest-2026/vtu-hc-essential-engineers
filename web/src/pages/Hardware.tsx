@@ -220,7 +220,8 @@ export default function Hardware() {
         <div className="gutter">
           <h2 className="title">The hardware's normal, and what it taught us</h2>
           <p className="note">
-            Reference rounds sat within 0.2 points of honest key rounds in every session, across {Math.round(hoursSpan)} hours.
+            On {backend}, reference rounds sat within 0.2 points of honest key rounds in every session, across{' '}
+            {Math.round(hoursSpan)} hours; on the other machines, within 0.3.
             Getting there took two failed batches.
           </p>
         </div>
@@ -230,9 +231,9 @@ export default function Hardware() {
               <span className="subtitle">Honest sessions over time</span>
               <Legend items={[{ label: 'Key rounds', color: C.s1, kind: 'dot' }, { label: 'Reference rounds', color: C.s2, kind: 'dot' }]} />
             </div>
-            <DriftDots groups={echo.map((b) => {
+            <DriftDots groups={d.batches.filter((b) => b.timing === 'echo').map((b) => {
               const h = b.sessions.filter((s) => !s.is_attack)
-              return { label: `Batch ${b.batch}`, sub: fmtTime(b.submitted), key: h.map((s) => s.key_qber), ref: h.map((s) => s.ref_qber) }
+              return { label: `Batch ${b.batch}`, sub: b.backend.replace('ibm_', ''), key: h.map((s) => s.key_qber), ref: h.map((s) => s.ref_qber) }
             })} />
           </div>
           <div className="plate">
