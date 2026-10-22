@@ -143,12 +143,10 @@ batches from her account.
 
 | When | Work |
 |---|---|
-| 21 Oct night | Validate session-test false alarms on 400 honest training-regime sessions; commit |
-| 21 Oct night | `src/main.py` entry point, GitHub Actions CI, static README figures |
-| 22 Oct morning | **Monitoring-layer prototype**: vendor-neutral telemetry format (per link and window: key and reference counts); streaming `nirikshak.monitor` (rolling reference window, session test, alarm log); network-operations view with several simulated links plus one link replaying real IBM sessions. All simulated links labelled as such, no operator branding |
-| 22 Oct, through the day | Drift batches every few hours (own and teammates' accounts); second backend (`ibm_fez` or `ibm_marrakesh`) |
-| 22 Oct afternoon | Dashboard redesign; optional decoy-state BB84 with simulated photon-number-splitting attack |
-| 22 Oct evening | Slides, demo script, recorded demo video |
+| Done 22 Oct | Session test validated (400 + 200 honest simulated sessions, 5-6% false alarms); `src/main.py`, GitHub Actions CI, README figures; batch 5 on ibm_kingston 21 h after batch 4; monitoring-layer prototype (`nirikshak.monitor`, telemetry format, Network monitor tab) |
+| 22 Oct night | Batch 6 on `ibm_fez` (queued): second-backend comparison into README and scorecard |
+| 22 Oct night | Dashboard redesign |
+| 23 Oct early | Slides, demo script, recorded demo video; optional decoy-state BB84 with simulated photon-number-splitting attack if time allows |
 | 23 Oct until 12:00 | Code freeze, final README and portal summary, demo rehearsal; 12:00-15:00 buffer |
 
 ### Hardware budget rules

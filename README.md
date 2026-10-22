@@ -191,6 +191,7 @@ vtu-hc-essential-engineers/
 │   ├── detectors/           # 11% rule, conformal thresholds, Nirikshak, sim-trained ML
 │   ├── scorecard/           # false-alarm and detection rates per condition
 │   ├── hardware/            # credentials, qubit selection, calibration, timing match, batches
+│   ├── monitor/             # streaming monitor: telemetry format, per-link verdicts, demo network
 │   ├── session.py           # key + reference rounds per session
 │   ├── conditions.py        # standard attack conditions (simulation and hardware)
 │   ├── sim.py               # Aer runner (same Sampler V2 interface as hardware)
@@ -258,6 +259,7 @@ python -m src.main --demo         # 1 minute: honest vs attacked session on the 
 python -m src.main                # demo + stress test + scorecard + figures, a few minutes
 python -m pytest -q               # tests
 python -m nirikshak.dashboard     # Streamlit dashboard
+python -m nirikshak.monitor --demo demo.jsonl && python -m nirikshak.monitor demo.jsonl  # network monitor
 ```
 
 No IBM account is needed: the hardware results are committed in `data/hardware/`.
@@ -423,6 +425,32 @@ Batch 1's detection rates (100% everywhere) were inflated by this artifact and a
 claimed; batches 1-2 are excluded from all pooled hardware numbers. A qubit-0 readout failure
 in an earlier smoke test that IBM's calibration did not predict is why qubits are picked from
 live calibration and per-qubit errors are recorded.
+
+### Prototype: Nirikshak as a network monitoring layer
+
+`nirikshak.monitor` runs Nirikshak on a stream of link telemetry, one record per block:
+
+```json
+{"link_id": "L3", "t": "2026-10-22T14:05:00+05:30", "kind": "key", "sifted": 512, "errors": 9}
+```
+
+`kind` is `key` (the key exchange's parameter-estimation sample) or `ref` (local reference
+states at the receiver that never cross the channel). Nothing else is needed, no key material and
+no vendor-specific fields. Per link and hourly window, the monitor gives a verdict (key vs
+reference permutation test, 5% budget), block alarms from a rolling reference window, and an
+alarm log. The dashboard's Network monitor tab shows a demo network: four simulated links and
+one replaying the real ibm_kingston sessions. Over 30 random seeds (2,100 honest windows):
+
+| Simulated link | Windows flagged | Key blocks flagged per honest window (of 20) |
+| :--- | :-: | :-: |
+| Honest windows, all links | 5.3% | about 1 (Nirikshak) |
+| L2, drifting from 1.7% to 4.2% QBER | 5.0% | 1.0 Nirikshak vs 8.2 for a threshold frozen at commissioning |
+| L3, tapped on 1 of 16 rounds | 100% after the tap | 0 for the 11% rule |
+| L4, daily cycle + tap on 2 of 16 | 100% after the tap | 0 for the 11% rule |
+
+This is a prototype. The simulated links use binomial error counts, and real deployment
+would need photonic details (decoy states, detector statistics, finite-key effects) and
+operator integration.
 
 ### Limitations
 
