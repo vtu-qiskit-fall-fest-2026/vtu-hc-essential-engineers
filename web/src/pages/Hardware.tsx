@@ -1,182 +1,206 @@
-import { useState } from 'react'
+import { Fragment, useState } from 'react'
 import { BlockStrip, DetectionBars, DriftDots } from '../charts/charts'
-import { Legend, C } from '../charts/core'
-import { ci, fmtTime, pct, pctRange, pretty, pval, timingLabel, useData, type Hardware as HW } from '../data'
+import { C, Legend } from '../charts/core'
+import { QberRuler } from '../charts/ruler'
+import { fmtTime, pct, pctRange, pretty, pval, timingLabel, useData, type Hardware as HW, type HwSession } from '../data'
+
+const mean = (xs: number[]) => xs.reduce((a, b) => a + b, 0) / xs.length
+const minmax = (xs: number[]): [number, number] => [Math.min(...xs), Math.max(...xs)]
+
+function Glyph({ hit }: { hit: boolean }) {
+  return hit
+    ? <svg width="11" height="11" viewBox="0 0 10 10" aria-label="flagged"><path d="M5 1 L9.5 9 H0.5 Z" fill="var(--alarm)" /></svg>
+    : <svg width="11" height="11" viewBox="0 0 10 10" aria-label="clean"><circle cx="5" cy="5" r="3.6" fill="none" stroke="var(--ink-3)" strokeWidth="1.5" /></svg>
+}
 
 export default function Hardware() {
   const d = useData<HW>('hardware')
   const [batchIdx, setBatchIdx] = useState<number | null>(null)
-  if (!d) return <div className="loading">Loading results...</div>
+  if (!d) return null
 
-  const backends = Object.keys(d.pooled)
-  const backend = backends.includes('ibm_kingston') ? 'ibm_kingston' : backends[0]
+  const backend = Object.keys(d.pooled).includes('ibm_kingston') ? 'ibm_kingston' : Object.keys(d.pooled)[0]
   const pooled = d.pooled[backend]
-  const echo = d.batches.filter((b) => b.timing === 'echo')
-  const attacks = pooled.conditions.filter((c) => c.is_attack)
-  const smallest = pooled.conditions.find((c) => c.condition === 'intercept 1/16')
-  const ruleCaught = attacks.filter((c) => (c.rule.rate ?? 0) >= 0.5).length
+  const echo = d.batches.filter((b) => b.timing === 'echo' && b.backend === backend)
+  const sessions = echo.flatMap((b) => b.sessions)
+  const honest = sessions.filter((s) => !s.is_attack)
   const sel = batchIdx ?? d.batches.indexOf(echo[echo.length - 1])
   const batch = d.batches[sel]
-  const hoursSpan = echo.length > 1
-    ? (Date.parse(echo[echo.length - 1].submitted!.replace(/(\+\d{2})(\d{2})$/, '$1:$2')) -
-       Date.parse(echo[0].submitted!.replace(/(\+\d{2})(\d{2})$/, '$1:$2'))) / 3.6e6
-    : 0
+  const iso = (s: string) => s.replace(/(\+\d{2})(\d{2})$/, '$1:$2')
+  const hoursSpan = (Date.parse(iso(echo[echo.length - 1].submitted!)) - Date.parse(iso(echo[0].submitted!))) / 3.6e6
+  const qseconds = echo.reduce((a, b) => a + (b.quantum_seconds ?? 0), 0)
+
+  const marks = [1, 2, 4, 8].map((k) => {
+    const c = pooled.conditions.find((x) => x.condition === `intercept ${k}/16`)!
+    const ss = sessions.filter((s) => s.condition === `intercept ${k}/16`)
+    return {
+      rounds: k, qber: mean(ss.map((s) => s.key_qber)),
+      caught: `${c.sessions.k} of ${c.sessions.n} sessions`,
+      rule: c.rule.k === 0 ? 'never' : `${pct(c.rule.rate)} of blocks`,
+    }
+  })
+  const bySession = (cond: string, b: (typeof echo)[number]): HwSession[] => b.sessions.filter((s) => s.condition === cond)
 
   return (
     <>
-      <div className="page-head">
-        <span className="eyebrow">Real IBM Quantum hardware · {backend}</span>
-        <h1>Catching eavesdroppers on real quantum hardware</h1>
-        <p className="lede">
-          We ran BB84 key exchanges on IBM's {backend}, with and without an eavesdropper, across {echo.length} batches
-          over {Math.round(hoursSpan)} hours. Nirikshak compares every session against honest reference rounds measured on
-          the same qubits at the same time, so device drift cancels and small attacks stand out.
+      <section className="hero">
+        <div className="hero-top">
+        <h1 className="statement">Eve stays far below 11%. Nirikshak still catches her.</h1>
+        <p className="prose">
+          We ran BB84 on IBM's {backend} with and without an eavesdropper, in {echo.length} batches across{' '}
+          {Math.round(hoursSpan)} hours. Each blue marker is a real intercept attack, placed at the error rate it caused.
+          BB84 only stops at 11%. Nirikshak compares every session with honest reference rounds measured on the same
+          qubits at the same time, so it reacts to anything above today's normal.
         </p>
-      </div>
+        </div>
+        <QberRuler marks={marks} rule={d.rule_11}
+          honest={minmax(honest.map((s) => s.key_qber))}
+          reference={minmax(sessions.map((s) => s.ref_qber))} />
+      </section>
 
-      <div className="grid-4">
-        <div className="card stat accent">
-          <span className="label">Attacked sessions caught</span>
-          <span className="value">{pooled.attacked_sessions.k}<small>of {pooled.attacked_sessions.n}</small></span>
-          <span className="note">95% interval {ci(pooled.attacked_sessions)}; every p ≤ {pval(pooled.max_attacked_p)}</span>
+      <section className="finding">
+        <div className="gutter">
+          <h2 className="title">Every attacked session flagged</h2>
+          <dl className="facts">
+            <div><dt>Backend</dt><dd>{backend} (Heron r2)</dd></div>
+            <div><dt>Batches</dt><dd>{echo.map((b) => b.batch).join(', ')}, from {fmtTime(echo[0].submitted)} to {fmtTime(echo[echo.length - 1].submitted)}</dd></div>
+            <div><dt>Sessions</dt><dd>{sessions.length}, each 20 key and 20 reference blocks</dd></div>
+            <div><dt>Quantum time</dt><dd>{qseconds} s</dd></div>
+          </dl>
         </div>
-        <div className="card stat">
-          <span className="label">Honest sessions flagged</span>
-          <span className="value">{pooled.honest_sessions.k}<small>of {pooled.honest_sessions.n}</small></span>
-          <span className="note">
-            budget 5%; in simulation {pct(d.sim_session_false_alarms.train_honest?.rate)} of {d.sim_session_false_alarms.train_honest?.n} honest sessions
-          </span>
+        <div className="body">
+          <p className="tally">
+            <span className="n key">{pooled.attacked_sessions.k} of {pooled.attacked_sessions.n}</span> attacked sessions
+            flagged, each with p ≤ {pval(pooled.max_attacked_p)}.{' '}
+            <span className="n">{pooled.honest_sessions.k} of {pooled.honest_sessions.n}</span> honest sessions flagged,
+            against a budget of 5%; on {d.sim_session_false_alarms.train_honest?.n} simulated honest sessions the rate
+            was {pct(d.sim_session_false_alarms.train_honest?.rate)}.
+          </p>
+          <div className="plate">
+            <div className="table-wrap"><div className="matrix" style={{ ['--cols' as string]: echo.length }}>
+              <div className="mh">Session</div>
+              {echo.map((b) => <div className="mh" key={b.job_id}>Batch {b.batch}, {fmtTime(b.submitted, false)}</div>)}
+              <div className="mh end">BB84 key rate</div>
+              {pooled.conditions.map((c) => (
+                <Fragment key={c.condition}>
+                  <div className="cond">{pretty(c.condition)}</div>
+                  {echo.map((b) => {
+                    const ss = bySession(c.condition, b)
+                    const hit = ss.some((s) => s.verdict)
+                    return (
+                      <div key={b.job_id} className={`cell ${hit ? 'hit' : ''}`}
+                        title={ss.map((s) => `p = ${pval(s.p_value)}`).join(', ')}>
+                        <span className="glyphs">{ss.map((s) => <Glyph key={s.session} hit={s.verdict} />)}</span>
+                        {ss.length === 1 && <span>p {pval(ss[0].p_value)}</span>}
+                      </div>
+                    )
+                  })}
+                  <div className="end">{c.key_rate[1] === 0 ? '0, aborts' : `${c.key_rate[0].toFixed(2)}-${c.key_rate[1].toFixed(2)}`}</div>
+                </Fragment>
+              ))}
+            </div></div>
+            <p className="note" style={{ marginTop: 14 }}>
+              Red triangle: session verdict attack (one-sided permutation test of key blocks against the session's own
+              reference blocks, 5% budget). Circle: clean. Key rate is the asymptotic BB84 rate 1 − 2h(QBER); above
+              zero, BB84 keeps making keys and never reports Eve.
+            </p>
+          </div>
         </div>
-        <div className="card stat">
-          <span className="label">Smallest attack caught</span>
-          <span className="value">1<small>of 16 rounds</small></span>
-          <span className="note">
-            key QBER {smallest ? pctRange(smallest.key_qber[0], smallest.key_qber[1]) : ''}; BB84 would keep making keys
-          </span>
-        </div>
-        <div className="card stat">
-          <span className="label">Attacks the 11% rule catches</span>
-          <span className="value">{ruleCaught}<small>of {attacks.length}</small></span>
-          <span className="note">only Eve on 8 of 16 rounds crosses 11%</span>
-        </div>
-      </div>
+      </section>
 
-      <section className="section">
-        <div className="section-head">
-          <h2>Detection per attack</h2>
-          <p>
-            Share of key blocks flagged, pooled over the spin-echo batches. The session verdict (right) is the decision;
-            block alarms show where in a session to look. Whiskers: exact 95% intervals.
+      <section className="finding">
+        <div className="gutter">
+          <h2 className="title">Which blocks gave Eve away</h2>
+          <p className="note">
+            A block is 8 random settings of 16 rounds, about 512 sifted bits. Each key block is compared with a threshold
+            set from that session's 20 reference blocks. Bars pool the three batches; whiskers are exact 95% intervals.
           </p>
         </div>
-        <div className="grid-2 wide-left">
-          <div className="card">
-            <div className="card-title">
-              <h3>Key blocks flagged</h3>
+        <div className="body">
+          <div className="plate">
+            <div className="plate-head">
+              <span className="subtitle">Key blocks flagged</span>
               <Legend items={[{ label: 'Nirikshak', color: C.s1 }, { label: '11% rule', color: C.neutral }]} />
             </div>
             <DetectionBars rows={pooled.conditions.map((c) => ({
               label: c.condition, note: c.condition === 'honest' ? 'false alarms' : undefined, a: c.nirikshak, b: c.rule,
             }))} />
           </div>
-          <div className="card">
-            <div className="card-title"><h3>Session verdicts</h3><span className="sub">sessions flagged</span></div>
-            <div className="table-wrap">
-              <table>
-                <thead><tr><th>Condition</th><th className="num">Key QBER</th><th className="num">Key rate</th><th className="num">Flagged</th></tr></thead>
-                <tbody>
-                  {pooled.conditions.map((c) => (
-                    <tr key={c.condition}>
-                      <td>{pretty(c.condition)}</td>
-                      <td className="num">{pctRange(c.key_qber[0], c.key_qber[1])}</td>
-                      <td className="num">{c.key_rate[0] === 0 && c.key_rate[1] === 0 ? '0 (abort)' : `${c.key_rate[0].toFixed(2)}-${c.key_rate[1].toFixed(2)}`}</td>
-                      <td className="num">
-                        <span className={`badge ${c.is_attack ? (c.sessions.k === c.sessions.n ? 'attack' : 'muted') : 'clean'}`}>
-                          {c.sessions.k} of {c.sessions.n}
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            <p className="note" style={{ marginTop: 12 }}>
-              Key rate: asymptotic BB84 secret bits per sifted bit, 1 − 2h(QBER). Above zero, the protocol carries on
-              and never reports the eavesdropper.
-            </p>
-          </div>
         </div>
       </section>
 
-      <section className="section">
-        <div className="section-head">
-          <h2>Inside one batch</h2>
-          <p>
-            One IBM job, ten sessions. Each column is a session: hollow gray dots are its honest reference blocks, filled
-            dots its key blocks that crossed the session's threshold (orange line). The dashed line is the 11% rule.
-          </p>
-        </div>
-        <div className="card">
-          <div className="card-title" style={{ alignItems: 'center' }}>
-            <div className="seg">
-              {d.batches.map((b, i) => (
-                <button key={b.job_id} className={i === sel ? 'on' : ''} onClick={() => setBatchIdx(i)}>
-                  Batch {b.batch}{b.backend !== backend ? ` (${b.backend.replace('ibm_', '')})` : ''}
-                </button>
-              ))}
-            </div>
-            <span className="sub">
-              {batch.backend} · {fmtTime(batch.submitted)} · {timingLabel(batch.timing)} · job <span className="mono">{batch.job_id}</span>
-            </span>
-          </div>
+      <section className="finding">
+        <div className="gutter">
+          <h2 className="title">Inside one batch</h2>
+          <dl className="facts">
+            <div><dt>IBM job</dt><dd>{batch.job_id}</dd></div>
+            <div><dt>Backend</dt><dd>{batch.backend}</dd></div>
+            <div><dt>Submitted</dt><dd>{fmtTime(batch.submitted)}</dd></div>
+            <div><dt>Timing</dt><dd>{timingLabel(batch.timing)}</dd></div>
+            <div><dt>Honest QBER</dt><dd>{pct(batch.honest_qber, 2)}</dd></div>
+          </dl>
           {batch.timing !== 'echo' && (
-            <p className="callout" style={{ marginBottom: 12 }}>
-              Not used for claims: {batch.timing === 'none'
-                ? 'rounds Eve did not touch waited during her measurements and picked up extra noise.'
-                : 'plain idling raised the honest noise floor to 4%. Fixed with a spin echo from batch 3 on.'}
+            <p className="note">
+              Not used for any claim: {batch.timing === 'none'
+                ? 'rounds Eve never touched waited during her measurements and picked up extra noise.'
+                : 'plain idling raised the honest noise floor to 4%. A spin echo fixed it from batch 3.'}
             </p>
           )}
-          <Legend items={[
-            { label: 'Attacked session, block flagged', color: C.s1, kind: 'dot' },
-            { label: 'not flagged', color: C.s1, kind: 'ring' },
-            { label: 'Honest session block', color: C.neutral, kind: 'ring' },
-            { label: 'Reference block', color: 'var(--text-3)', kind: 'dot' },
-            { label: 'Session threshold', color: C.s2, kind: 'line' },
-          ]} />
-          <div style={{ marginTop: 10 }}>
-            <BlockStrip rule={d.rule_11} sessions={batch.sessions.map((s) => ({
-              label: s.condition, is_attack: s.is_attack, threshold: s.threshold, key_blocks: s.key_blocks,
-              ref_blocks: s.ref_blocks, verdict: s.verdict, p_value: s.p_value,
-            }))} />
+        </div>
+        <div className="body">
+          <div className="seg" role="tablist">
+            {d.batches.map((b, i) => (
+              <button key={b.job_id} role="tab" aria-selected={i === sel} className={i === sel ? 'on' : ''} onClick={() => setBatchIdx(i)}>
+                Batch {b.batch}{b.backend !== backend ? `, ${b.backend.replace('ibm_', '')}` : ''}
+              </button>
+            ))}
+          </div>
+          <div className="plate">
+            <Legend items={[
+              { label: 'Attacked session: flagged block', color: C.s1, kind: 'dot' },
+              { label: 'unflagged block', color: C.s1, kind: 'ring' },
+              { label: 'Honest session block', color: C.neutral, kind: 'ring' },
+              { label: 'Reference block', color: 'var(--ink-3)', kind: 'dot' },
+              { label: "Session's threshold", color: C.s2, kind: 'line' },
+            ]} />
+            <div style={{ marginTop: 10 }}>
+              <BlockStrip rule={d.rule_11} sessions={batch.sessions.map((s) => ({
+                label: s.condition, is_attack: s.is_attack, threshold: s.threshold, key_blocks: s.key_blocks,
+                ref_blocks: s.ref_blocks, verdict: s.verdict, p_value: s.p_value,
+              }))} />
+            </div>
           </div>
         </div>
       </section>
 
-      <section className="section">
-        <div className="grid-2">
-          <div className="card">
-            <div className="card-title">
-              <h3>Honest sessions over time</h3>
+      <section className="finding">
+        <div className="gutter">
+          <h2 className="title">The hardware's normal, and what it taught us</h2>
+          <p className="note">
+            Reference rounds sat within 0.2 points of honest key rounds in every session, across {Math.round(hoursSpan)} hours.
+            Getting there took two failed batches.
+          </p>
+        </div>
+        <div className="body split even">
+          <div className="plate">
+            <div className="plate-head">
+              <span className="subtitle">Honest sessions over time</span>
               <Legend items={[{ label: 'Key rounds', color: C.s1, kind: 'dot' }, { label: 'Reference rounds', color: C.s2, kind: 'dot' }]} />
             </div>
             <DriftDots groups={echo.map((b) => {
               const h = b.sessions.filter((s) => !s.is_attack)
-              return { label: `${b.backend.replace('ibm_', '')} batch ${b.batch}`, sub: fmtTime(b.submitted), key: h.map((s) => s.key_qber), ref: h.map((s) => s.ref_qber) }
+              return { label: `Batch ${b.batch}`, sub: fmtTime(b.submitted), key: h.map((s) => s.key_qber), ref: h.map((s) => s.ref_qber) }
             })} />
-            <p className="note" style={{ marginTop: 8 }}>
-              Reference rounds track key rounds in every session, which is what lets them set the alarm threshold.
-            </p>
           </div>
-          <div className="card">
-            <div className="card-title"><h3>What the hardware taught us</h3></div>
-            <div className="table-wrap">
+          <div className="plate">
+            <span className="subtitle">Timing between preparation and measurement</span>
+            <div className="table-wrap" style={{ marginTop: 10 }}>
               <table>
-                <thead><tr><th>Batch</th><th>Timing</th><th className="num">Honest QBER</th><th className="num">Untouched rounds</th></tr></thead>
+                <thead><tr><th>Batch</th><th>Idle qubits</th><th className="num">Honest</th><th className="num">Rounds Eve skipped</th></tr></thead>
                 <tbody>
                   {d.batches.map((b) => (
                     <tr key={b.job_id}>
-                      <td>{b.batch}{b.backend !== backend ? ` (${b.backend})` : ''}</td>
-                      <td>{b.timing === 'echo' ? 'spin echo' : b.timing === 'delay' ? 'plain idle' : 'not matched'}</td>
+                      <td>{b.batch}{b.backend !== backend ? `, ${b.backend}` : ''}</td>
+                      <td>{b.timing === 'echo' ? 'spin echo' : b.timing === 'delay' ? 'plain wait' : 'unmatched'}</td>
                       <td className="num">{pct(b.honest_qber, 1)}</td>
                       <td className="num">{b.untouched[0] != null ? pctRange(b.untouched[0], b.untouched[1]) : ''}</td>
                     </tr>
@@ -185,9 +209,9 @@ export default function Hardware() {
               </table>
             </div>
             <p className="note" style={{ marginTop: 12 }}>
-              Batch 1: Eve's mid-circuit measurements made every qubit wait, so rounds she never touched got noisier,
-              which inflated detection. Batch 2: equal timing for every circuit, but idling dephased the qubits. From
-              batch 3: a spin echo during the wait. Untouched rounds now match honest ones.
+              In batch 1 Eve's mid-circuit measurements made every qubit wait, so rounds she never touched got noisier
+              and detection looked better than it was. Batch 2 gave every circuit the same wait, but idling dephased the
+              qubits. From batch 3 a spin echo fills the wait, and rounds Eve skips look like honest rounds.
             </p>
           </div>
         </div>
@@ -195,4 +219,3 @@ export default function Hardware() {
     </>
   )
 }
-

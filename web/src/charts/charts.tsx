@@ -359,7 +359,7 @@ export function LinkTrace({ h, qber, threshold, alarm, frozen, hours, upto, atta
             {frozen != null && (
               <g>
                 <line x1={left} x2={w} y1={y(frozen)} y2={y(frozen)} stroke={C.neutral} strokeWidth={1.5} strokeDasharray="5 4" />
-                <text x={w} y={y(frozen) - 5} textAnchor="end" style={{ fill: 'var(--text-2)', fontSize: 11 }}>frozen at commissioning</text>
+                <text x={left + 6} y={y(frozen) - 6} style={{ fill: 'var(--text-2)', fontSize: 11.5 }}>fixed at commissioning</text>
               </g>
             )}
             {h.map((v, i) => v < upto && (
@@ -376,23 +376,23 @@ export function LinkTrace({ h, qber, threshold, alarm, frozen, hours, upto, atta
 
 /* ------------------------------------------------------------------ heat table */
 
-export function HeatTable({ rows, cols, value, fmt, good }: {
+export function HeatTable({ rows, cols, value, fmt, good, rowLabel }: {
   rows: string[]; cols: string[]; value: (r: string, c: string) => number | undefined
-  fmt?: (v: number) => string; good: 'low' | 'high'
+  fmt?: (v: number) => string; good: 'low' | 'high'; rowLabel?: (r: string) => string
 }) {
   return (
     <div className="table-wrap">
       <table>
         <thead>
           <tr>
-            <th>Test set</th>
+            <th>Tested on</th>
             {cols.map((c) => <th key={c} className="num" style={{ whiteSpace: 'normal', minWidth: 90 }}>{c}</th>)}
           </tr>
         </thead>
         <tbody>
           {rows.map((r) => (
             <tr key={r}>
-              <td style={{ whiteSpace: 'normal', minWidth: 180 }}>{r}</td>
+              <td style={{ whiteSpace: 'normal', minWidth: 170 }}>{rowLabel ? rowLabel(r) : r}</td>
               {cols.map((c) => {
                 const v = value(r, c)
                 const bad = v == null ? 0 : good === 'low' ? v : 1 - v

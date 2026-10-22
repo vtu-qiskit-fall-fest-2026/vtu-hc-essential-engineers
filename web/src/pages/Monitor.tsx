@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useState } from 'react'
-import { LinkTrace, MonitorGrid, type GridCell } from '../charts/charts'
+import { LinkTrace } from '../charts/charts'
 import { C, Legend } from '../charts/core'
 import { Verdict as VerdictBadge } from '../components/ui'
-import { pct, pval, useData, type Monitor as M } from '../data'
+import { pct, pval, useData, type Monitor as M, type Verdict } from '../data'
 
 const hh = (h: number) => `${String(Math.floor(h) % 24).padStart(2, '0')}:00`
-const day = (h: number) => (h >= 24 ? ' (+1 day)' : '')
+const avg = (xs: number[]) => xs.reduce((a, b) => a + b, 0) / Math.max(xs.length, 1)
 
 export default function Monitor() {
   const d = useData<M>('monitor')
@@ -13,6 +13,7 @@ export default function Monitor() {
   const [upto, setUpto] = useState<number | null>(null)
   const [playing, setPlaying] = useState(false)
   const [pick, setPick] = useState('L3')
+  const [hot, setHot] = useState<Verdict | null>(null)
 
   const now = upto ?? hours
   useEffect(() => {
@@ -23,178 +24,186 @@ export default function Monitor() {
         if (next >= hours) { setPlaying(false); return hours }
         return next
       })
-    }, 550)
+    }, 500)
     return () => clearInterval(id)
   }, [playing, hours])
 
-  if (!d) return <div className="loading">Loading monitor...</div>
+  if (!d) return null
 
-  const links = d.links.map((l) => l.link_id)
-  const cells: GridCell[] = d.verdicts.map((v) => ({
-    link: v.link_id, h: v.window, alarm: v.alarm, truth: v.truth, p: v.p_value, key: v.key_qber, ref: v.ref_qber,
-    label: `${hh(v.window)}-${hh(v.window + 1)}${day(v.window)}`,
-  }))
   const seen = d.verdicts.filter((v) => v.window < now)
   const honest = d.verdicts.filter((v) => v.truth === 'honest')
   const attacked = d.verdicts.filter((v) => v.truth !== 'honest')
   const l2 = d.verdicts.filter((v) => v.link_id === 'L2')
-  const avg = (xs: number[]) => xs.reduce((a, b) => a + b, 0) / Math.max(xs.length, 1)
   const b = d.blocks[pick]
   const linkInfo = d.links.find((l) => l.link_id === pick)!
   const feed = seen.filter((v) => v.alarm).sort((a, b2) => b2.window - a.window || a.link_id.localeCompare(b2.link_id))
+  const pickHours = Math.max(...d.verdicts.filter((v) => v.link_id === pick).map((v) => v.window)) + 1
 
   return (
     <>
-      <div className="page-head">
-        <span className="eyebrow">Prototype · monitoring layer for a QKD network</span>
-        <h1>One verdict per link, every hour</h1>
-        <p className="lede">
-          Each link streams a few numbers per block: how many sifted rounds, how many errors, for key rounds and for
-          local reference rounds that never cross the channel. Nirikshak turns that into an hourly verdict with a 5%
-          false-alarm budget, whatever the link's noise is doing.
-        </p>
-        <p className="note">
-          Links L1-L4 are simulated. L5 replays real ibm_kingston sessions, one per hour, including attacks we ran
-          ourselves. No real operator, network or traffic is represented.
-        </p>
-      </div>
+      <section className="hero">
+        <div className="hero-top">
+          <h1 className="statement">One verdict per link, every hour.</h1>
+          <p className="prose">
+            Each link reports a few counts per block: sifted rounds and errors, for key rounds and for local reference
+            rounds that never cross the channel. Nirikshak turns them into an hourly verdict that stays within a 5%
+            false-alarm budget however the link drifts. Four links here are simulated; L5 replays our real ibm_kingston
+            sessions, one per hour. No real operator or network is shown.
+          </p>
+        </div>
+      </section>
 
-      <div className="card" style={{ display: 'grid', gap: 16 }}>
+      <section className="plate" style={{ display: 'grid', gap: 14 }}>
         <div className="controls">
-          <button className="btn primary" onClick={() => {
+          <button className="btn" onClick={() => {
             if (playing) return setPlaying(false)
             if (now >= hours) setUpto(0)
             setPlaying(true)
           }}>
-            <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden>
+            <svg width="11" height="11" viewBox="0 0 12 12" aria-hidden>
               {playing ? <><rect x="2" y="1" width="3" height="10" fill="currentColor" /><rect x="7" y="1" width="3" height="10" fill="currentColor" /></>
                 : <path d="M2 1 L11 6 L2 11 Z" fill="currentColor" />}
             </svg>
             {playing ? 'Pause' : now >= hours ? 'Replay the day' : 'Play'}
           </button>
           <label className="control" style={{ flex: 1, minWidth: 200 }}>
-            <span>Time · {now >= hours ? `all ${hours} hours` : `${hh(now)}${day(now)}`}</span>
-            <input type="range" min={0} max={hours} value={now} onChange={(e) => { setPlaying(false); setUpto(+e.target.value) }} />
+            <span>{now >= hours ? `Showing all ${hours} hours` : `Showing up to ${hh(now)}${now >= 24 ? ' the next day' : ''}`}</span>
+            <input type="range" min={0} max={hours} value={now} aria-label="Hour"
+              onChange={(e) => { setPlaying(false); setUpto(+e.target.value) }} />
           </label>
         </div>
 
-        <div className="grid-4" style={{ gridTemplateColumns: `repeat(auto-fit, minmax(170px, 1fr))` }}>
+        <div className="board" style={{ ['--hours' as string]: hours }} onMouseLeave={() => setHot(null)}>
+          <div className="board-row head">
+            <div className="who"><span className="src">Link</span></div>
+            <div className="hours">
+              {Array.from({ length: hours }, (_, h) => <span key={h}>{h % 6 === 0 ? hh(h) : ''}</span>)}
+            </div>
+            <div className="tallycol">Alarms</div>
+          </div>
           {d.links.map((l) => {
-            const lv = seen.filter((v) => v.link_id === l.link_id)
-            const last = lv[lv.length - 1]
+            const lv = d.verdicts.filter((v) => v.link_id === l.link_id)
+            const shown = lv.filter((v) => v.window < now)
+            const last = shown[shown.length - 1]
             return (
-              <button key={l.link_id} className={`card link-card ${last?.alarm ? 'alarm' : ''}`}
-                style={{ textAlign: 'left', cursor: 'pointer', font: 'inherit', color: 'inherit', outline: pick === l.link_id ? '2px solid var(--series-1)' : undefined }}
-                onClick={() => setPick(l.link_id)}>
-                <div className="row">
-                  <span className="id">{l.link_id}</span>
-                  {last ? <VerdictBadge alarm={last.alarm} /> : <span className="badge muted">waiting</span>}
+              <div key={l.link_id} className={`board-row ${pick === l.link_id ? 'picked' : ''}`}>
+                <button className="who" onClick={() => setPick(l.link_id)} aria-pressed={pick === l.link_id}>
+                  <span className="id">{l.link_id} {last ? <VerdictBadge alarm={last.alarm} /> : null}</span>
+                  <span className="desc">{l.description}</span>
+                  <span className="src">{l.source === 'simulated' ? 'Simulated' : 'Real IBM hardware, replayed'}</span>
+                </button>
+                <div className="strip">
+                  {Array.from({ length: hours }, (_, h) => {
+                    const v = lv.find((x) => x.window === h)
+                    if (!v) return <span key={h} />
+                    const future = h >= now
+                    return (
+                      <button key={h} aria-label={`${l.link_id} ${hh(h)}: ${v.alarm ? 'alarm' : 'clean'}`}
+                        className={`${!future && v.alarm ? 'alarm' : ''} ${future ? 'future' : ''} ${v.truth !== 'honest' ? 'truth' : ''} ${hot === v ? 'hot' : ''}`}
+                        onMouseEnter={() => !future && setHot(v)} onFocus={() => !future && setHot(v)}
+                        onClick={() => { setPick(l.link_id); if (!future) setHot(v) }} />
+                    )
+                  })}
                 </div>
-                <span className="desc">{l.description}</span>
-                <div className="row">
-                  <span className="src">{l.source}</span>
-                  <span className="note">{lv.filter((v) => v.alarm).length} of {lv.length} alarms</span>
-                </div>
-              </button>
+                <div className="tallycol">{shown.filter((v) => v.alarm).length} of {shown.length}</div>
+              </div>
             )
           })}
         </div>
 
-        <div>
-          <div className="card-title">
-            <h3>Verdicts by link and hour</h3>
-            <Legend items={[
-              { label: 'Alarm', color: 'var(--critical)' },
-              { label: 'Clean', color: 'var(--surface-2)' },
-              { label: 'Window really attacked', color: 'var(--text)', kind: 'line' },
-            ]} />
-          </div>
-          <MonitorGrid links={links} hours={hours} cells={cells} upto={now} onPick={setPick} />
+        <div className="readout" aria-live="polite">
+          {hot ? (
+            <>
+              <span><b>{hot.link_id}</b>, {hh(hot.window)} to {hh(hot.window + 1)}</span>
+              <span>Verdict <b>{hot.alarm ? 'alarm' : 'clean'}</b>, p {pval(hot.p_value)}</span>
+              <span>Key rounds <b>{pct(hot.key_qber, 2)}</b>, reference <b>{pct(hot.ref_qber, 2)}</b></span>
+              <span>Blocks over the threshold <b>{hot.blocks_flagged} of 20</b></span>
+              <span>What really happened <b>{hot.truth === 'honest' ? 'nothing, honest hour' : `attack, ${hot.truth}`}</b></span>
+            </>
+          ) : (
+            <span>Point at an hour to read its verdict. Red cells are alarms; a dark underline marks hours that were really attacked.</span>
+          )}
         </div>
-      </div>
+      </section>
 
-      <section className="section">
-        <div className="grid-2 wide-left">
-          <div className="card">
-            <div className="card-title">
-              <h3>{pick}: {linkInfo.description}</h3>
-              <div className="seg">
-                {links.map((l) => <button key={l} className={l === pick ? 'on' : ''} onClick={() => setPick(l)}>{l}</button>)}
-              </div>
-            </div>
+      <section className="finding">
+        <div className="gutter">
+          <h2 className="title">{pick}, block by block</h2>
+          <p className="note">{linkInfo.description}. Every dot is one key block. The orange line is Nirikshak's threshold,
+            recomputed from the last 20 reference blocks; the dashed line is a threshold fixed when the link was commissioned.</p>
+          <div className="seg">
+            {d.links.map((l) => <button key={l.link_id} className={l.link_id === pick ? 'on' : ''} onClick={() => setPick(l.link_id)}>{l.link_id}</button>)}
+          </div>
+        </div>
+        <div className="body">
+          <div className="plate">
             <Legend items={[
-              { label: 'Key block, flagged', color: C.s1, kind: 'dot' },
-              { label: 'Key block', color: 'var(--text-3)', kind: 'dot' },
-              { label: "Nirikshak's threshold (last 20 reference blocks)", color: C.s2, kind: 'line' },
-              { label: 'Threshold frozen at commissioning', color: C.neutral, kind: 'dash' },
-              { label: 'Attacked hours', color: 'var(--critical-soft)' },
+              { label: 'Flagged key block', color: C.s1, kind: 'dot' },
+              { label: 'Key block', color: 'var(--ink-3)', kind: 'dot' },
+              { label: "Nirikshak's threshold", color: C.s2, kind: 'line' },
+              { label: 'Fixed at commissioning', color: C.neutral, kind: 'dash' },
+              { label: 'Attacked hours', color: 'var(--alarm-soft)' },
             ]} />
             <div style={{ marginTop: 8 }}>
               <LinkTrace h={b.h} qber={b.qber} threshold={b.threshold} alarm={b.alarm} frozen={b.frozen_threshold}
-                hours={Math.max(...d.verdicts.filter((v) => v.link_id === pick).map((v) => v.window)) + 1} upto={now} attacked={d.verdicts.filter((v) => v.link_id === pick && v.truth !== 'honest').map((v) => v.window)} />
+                hours={pickHours} upto={now}
+                attacked={d.verdicts.filter((v) => v.link_id === pick && v.truth !== 'honest').map((v) => v.window)} />
             </div>
           </div>
-          <div className="card">
-            <div className="card-title"><h3>Alarm log</h3><span className="sub">{feed.length} alarms so far</span></div>
+        </div>
+      </section>
+
+      <section className="finding">
+        <div className="gutter">
+          <h2 className="title">Alarm log</h2>
+          <p className="note">What an operator would receive, newest first. False alarms are marked; at a 5% budget about one honest hour in twenty raises one.</p>
+        </div>
+        <div className="body split">
+          <div className="plate">
             <div className="feed">
-              {feed.length === 0 && <p className="note">No alarms yet.</p>}
+              {feed.length === 0 && <p className="note">No alarms yet. Press play to run the day.</p>}
               {feed.map((v) => (
                 <div className="feed-item" key={v.link_id + v.window}>
                   <span className="t">{hh(v.window)}</span>
                   <span className="l">{v.link_id}</span>
-                  <span className="d" title={`p-value ${pval(v.p_value)}`}>{pct(v.key_qber, 1)} key · {pct(v.ref_qber, 1)} ref</span>
-                  <span className={`badge ${v.truth === 'honest' ? 'muted' : 'attack'}`}>{v.truth === 'honest' ? 'false alarm' : 'real'}</span>
+                  <span className="d" title={`p-value ${pval(v.p_value)}`}>key {pct(v.key_qber, 1)}, reference {pct(v.ref_qber, 1)}</span>
+                  <span className={`badge ${v.truth === 'honest' ? 'muted' : 'attack'}`}>{v.truth === 'honest' ? 'false alarm' : 'attack'}</span>
                 </div>
               ))}
             </div>
           </div>
-        </div>
-      </section>
-
-      <section className="section">
-        <div className="grid-4">
-          <div className="card stat">
-            <span className="label">Honest hours flagged</span>
-            <span className="value">{pct(avg(honest.map((v) => +v.alarm)))}</span>
-            <span className="note">{honest.filter((v) => v.alarm).length} of {honest.length}; budget 5% (5.3% over 30 random days)</span>
-          </div>
-          <div className="card stat accent">
-            <span className="label">Attacked hours flagged</span>
-            <span className="value">{pct(avg(attacked.map((v) => +v.alarm)))}</span>
-            <span className="note">{attacked.filter((v) => v.alarm).length} of {attacked.length}, including a tap on 1 of 16 rounds</span>
-          </div>
-          <div className="card stat">
-            <span className="label">Attacked hours over 11% QBER</span>
-            <span className="value">{pct(avg(attacked.map((v) => +(v.key_qber > 0.11))))}</span>
-            <span className="note">what a fixed 11% alarm would have seen</span>
-          </div>
-          <div className="card stat">
-            <span className="label">Drifting link L2, blocks flagged per hour</span>
-            <span className="value">{avg(l2.map((v) => v.blocks_flagged)).toFixed(1)}<small>vs {avg(l2.map((v) => v.blocks_flagged_frozen)).toFixed(1)}</small></span>
-            <span className="note">Nirikshak vs a threshold frozen at commissioning (of 20)</span>
+          <div className="plate" style={{ display: 'grid', gap: 14, alignContent: 'start' }}>
+            <p className="tally" style={{ fontSize: 18 }}>
+              <span className="n key">{pct(avg(attacked.map((v) => +v.alarm)))}</span> of attacked hours flagged, including a
+              tap on 1 of 16 rounds. <span className="n">{pct(avg(attacked.map((v) => +(v.key_qber > 0.11))))}</span> of them
+              crossed 11%.
+            </p>
+            <p className="tally" style={{ fontSize: 18 }}>
+              <span className="n">{pct(avg(honest.map((v) => +v.alarm)))}</span> of honest hours flagged ({honest.filter((v) => v.alarm).length} of{' '}
+              {honest.length}); over 30 simulated days it was 5.3%.
+            </p>
+            <p className="tally" style={{ fontSize: 18 }}>
+              On the drifting link L2, <span className="n">{avg(l2.map((v) => v.blocks_flagged)).toFixed(1)}</span> blocks
+              an hour crossed Nirikshak's threshold, against <span className="n">{avg(l2.map((v) => v.blocks_flagged_frozen)).toFixed(1)}</span> for
+              the commissioning threshold.
+            </p>
           </div>
         </div>
       </section>
 
-      <section className="section">
-        <div className="grid-2">
-          <div className="card">
-            <div className="card-title"><h3>Telemetry format</h3><span className="sub">JSON Lines, one record per block</span></div>
-            <pre className="code">{d.telemetry_example.map((r) => JSON.stringify(r)).join('\n')}</pre>
-            <p className="note" style={{ marginTop: 12 }}>
-              <code>kind</code> is <code>key</code> (the key exchange's parameter-estimation sample) or <code>ref</code> (local
-              reference states at the receiver). No key material, nothing vendor-specific.
-            </p>
-          </div>
-          <div className="card">
-            <div className="card-title"><h3>Run it on your own telemetry</h3></div>
-            <pre className="code">{`pip install -r requirements.txt
-python -m nirikshak.monitor --demo demo.jsonl   # this demo
-python -m nirikshak.monitor your_links.jsonl    # status + alarm log`}</pre>
-            <p className="note" style={{ marginTop: 12 }}>
-              A real deployment would also need photonic details (decoy states, detector statistics, finite-key effects)
-              and operator integration. This is a prototype.
-            </p>
+      <section className="finding">
+        <div className="gutter">
+          <h2 className="title">Plug in your own links</h2>
+          <p className="note">One JSON line per block. <code>kind</code> is <code>key</code> for the key exchange's
+            test sample or <code>ref</code> for local reference states. No key material, nothing vendor-specific.</p>
+        </div>
+        <div className="body split even">
+          <pre className="code">{d.telemetry_example.map((r) => JSON.stringify(r)).join('\n')}</pre>
+          <div style={{ display: 'grid', gap: 12, alignContent: 'start' }}>
+            <pre className="code">{`python -m nirikshak.monitor --demo demo.jsonl
+python -m nirikshak.monitor your_links.jsonl`}</pre>
+            <p className="note">A real deployment also needs photonic detail (decoy states, detector statistics,
+              finite-key effects) and integration with the operator's systems. This is a prototype.</p>
           </div>
         </div>
       </section>
