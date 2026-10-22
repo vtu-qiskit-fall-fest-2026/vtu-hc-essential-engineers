@@ -41,9 +41,9 @@ def plan(args):
         from qiskit_ibm_runtime.fake_provider import FakeKingston
         backend, service = FakeKingston(), None
     else:
-        from nirikshak.hardware import DEFAULT_BACKEND, get_service
+        from nirikshak.hardware import get_service
         service = get_service()
-        backend = service.backend(DEFAULT_BACKEND)
+        backend = service.backend(args.backend)
     pubs, layouts, slot_dt = compile_sessions(sessions, backend, exclude=args.exclude, seed=args.batch,
                                               timing=args.timing)
     shots = {s.spec.shots for s in sessions}
@@ -137,6 +137,7 @@ def main():
     ap.add_argument("--batch", type=int, default=1, help="batch number; sets the random seeds")
     ap.add_argument("--submit", action="store_true")
     ap.add_argument("--fetch", metavar="JOB_ID")
+    ap.add_argument("--backend", default=None, help="IBM backend (default: IBM_BACKEND in .env, else ibm_kingston)")
     ap.add_argument("--fake", action="store_true", help="run locally on FakeKingston (free)")
     ap.add_argument("--small", action="store_true", help="tiny sessions (for testing)")
     ap.add_argument("--honest-repeats", type=int, default=3)
@@ -145,6 +146,9 @@ def main():
                     help="echo (default): matched slot with spin echo; delay: batch 2; none: batch 1")
     ap.add_argument("--max-seconds", type=float, default=60, help="refuse to submit above this estimate")
     args = ap.parse_args()
+    if args.backend is None:
+        from nirikshak.hardware.credentials import default_backend_name
+        args.backend = default_backend_name()
     if args.fetch:
         fetch(args.fetch)
     else:

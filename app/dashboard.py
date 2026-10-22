@@ -59,7 +59,7 @@ def load_hardware() -> dict[str, pd.DataFrame]:
     for p in sorted((ROOT / "data" / "hardware").glob("*.parquet")):
         df = pd.read_parquet(p)
         timing = lessons.loc[p.stem, "timing"] if p.stem in lessons.index else "unknown"
-        out[f"Batch {df['batch'].iloc[0]}: {timing} ({p.stem})"] = df
+        out[f"Batch {df['batch'].iloc[0]}, {df['backend_name'].iloc[0]}: {timing} ({p.stem})"] = df
     return out
 
 
@@ -232,12 +232,13 @@ with tab_lessons:
         "Honest QBER, X basis": lessons.honest_qber_x.map("{:.1%}".format),
         "Rounds Eve did not touch": [f"{a:.1%} to {b:.1%}" for a, b in zip(lessons.untouched_min, lessons.untouched_max)],
         "Rounds Eve touched": [f"{a:.1%} to {b:.1%}" for a, b in zip(lessons.touched_min, lessons.touched_max)],
-    })[["batch", "timing", "Honest QBER", "Honest QBER, X basis", "Rounds Eve did not touch",
+    })[["batch", "backend", "timing", "Honest QBER", "Honest QBER, X basis", "Rounds Eve did not touch",
         "Rounds Eve touched", "quantum_seconds", "job_id"]]
-    st.dataframe(view.rename(columns={"batch": "Batch", "timing": "Timing", "quantum_seconds": "Quantum s",
+    st.dataframe(view.rename(columns={"batch": "Batch", "backend": "Backend", "timing": "Timing", "quantum_seconds": "Quantum s",
                                       "job_id": "IBM job"}), width="stretch", hide_index=True)
     st.markdown("- **Batch 1:** Eve's mid-circuit measurements made every qubit wait; untouched rounds "
                 "dephased, inflating detection.\n"
                 "- **Batch 2:** every circuit idles for the same slot. Fair, but idling raised honest QBER "
                 "to 4% (phase errors).\n"
-                "- **Batch 3:** spin echo during the idle. Fair and low: untouched rounds match honest rounds.")
+                "- **Batch 3:** spin echo during the idle. Fair and low: untouched rounds match honest rounds.\n"
+                "- **Batches 4-5:** repeats, the second 21 hours later: honest QBER unchanged (1.75%, 1.8%).")

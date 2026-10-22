@@ -47,8 +47,8 @@ def main() -> None:
                 untouched.append(rates(s, bits[f"{i}_key_bob"], np.flatnonzero(~m)))
                 touched.append(rates(s, bits[f"{i}_key_bob"], np.flatnonzero(m)))
         rows.append({
-            "batch": meta["batch"], "job_id": job, "backend": meta["backend"], "timing": TIMING[timing],
-            "slot_us": meta.get("slot_dt", 0) * 4e-3,  # dt = 4 ns on ibm_kingston (Heron)
+            "batch": meta["batch"], "job_id": job, "backend": meta["backend"], "submitted": meta.get("submitted"), "timing": TIMING[timing],
+            "slot_us": meta.get("slot_dt", 0) * 4e-3,  # dt = 4 ns on Heron backends (ibm_kingston, ibm_fez)
             "quantum_seconds": meta.get("usage_seconds"),
             "honest_qber": np.mean([rates(sessions[i], bits[f"{i}_key_bob"], allr) for i in honest]),
             "honest_qber_x": np.mean([rates(sessions[i], bits[f"{i}_key_bob"], allr, 1) for i in honest]),
