@@ -46,6 +46,8 @@ def pretty(lbl: str) -> str:
 def detection() -> None:
     s = pd.read_csv(RESULTS / "sessions.csv")
     s = s[s["set"].str.startswith("hardware") & (s["timing"] == "echo")]
+    lessons = pd.read_csv(RESULTS / "hardware_lessons.csv")
+    s = s[s["job_id"].isin(lessons.loc[lessons["backend"] == "ibm_kingston", "job_id"])]
     g = s.groupby("condition")[["nirikshak_blocks", "rule_11_blocks"]].mean()
     g = g.loc[sorted(g.index, key=order_key)[::-1]]
     n_batches = s["job_id"].nunique()
@@ -119,7 +121,7 @@ def drift() -> None:
     ax.yaxis.set_major_formatter(matplotlib.ticker.PercentFormatter(1, decimals=1))
     ax.grid(axis="x", visible=False)
     ax.set_ylabel("QBER, honest sessions")
-    ax.set_title("Honest sessions: reference rounds track key rounds over time")
+    ax.set_title("Honest sessions: reference rounds track key rounds across time and machines")
     ax.legend(loc="lower right", frameon=False, fontsize=8)
     fig.tight_layout()
     fig.savefig(OUT / "drift.png")

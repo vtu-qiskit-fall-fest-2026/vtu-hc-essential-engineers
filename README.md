@@ -11,8 +11,9 @@ Quantum Key Distribution (QKD), built with Qiskit and run on IBM Quantum hardwar
 **Result on `ibm_kingston`:** across three batches 22 hours apart, Nirikshak flagged all 21
 attacked sessions (p ≤ 0.0002), including an eavesdropper touching 1 of 16 rounds, and none of
 the 9 honest ones. The textbook 11% rule caught only the largest attack, and BB84 would have kept
-producing keys through the rest. Detectors trained in simulation reached 82-88% false alarms
-once noise shifted, including on real hardware.
+producing keys through the rest. On a second, noisier machine (`ibm_marrakesh`, honest QBER 3.6%)
+it caught all 7 attacks with no retuning, while detectors trained in simulation flagged 78-83% of
+honest blocks there, and up to 88% elsewhere once noise shifted.
 
 </div>
 
@@ -161,7 +162,7 @@ flowchart LR
 | Language | Python 3.11+ (developed on 3.12) |
 | Quantum SDK | Qiskit 2.6.0, Qiskit IBM Runtime 0.50.0 (Sampler V2, job mode) |
 | Simulation | Qiskit Aer 0.18.0 (matrix product state), `FakeKingston` noise |
-| Hardware | IBM Quantum Open Plan, `ibm_kingston` (Heron r2) |
+| Hardware | IBM Quantum Open Plan, `ibm_kingston` and `ibm_marrakesh` (Heron r2) |
 | ML | scikit-learn 1.9.1, XGBoost 3.4.1 |
 | Detectors | 11% QBER rule, sim-calibrated threshold, Random Forest, XGBoost, Nirikshak (per-session conformal) |
 | Statistics | Split-conformal thresholds, permutation test (session verdict), Clopper-Pearson intervals (SciPy) |
@@ -213,7 +214,7 @@ vtu-hc-essential-engineers/
 ├── data/hardware/           # hardware block datasets (one parquet per job)
 ├── data/sim/                # simulated block datasets (train, test, drift, kingston, honest-only)
 ├── data/raw/                # raw bits and job metadata (git-ignored)
-├── notebooks/               # experiments and figures
+├── notebooks/walkthrough.ipynb  # guided tour on the committed data (outputs cleared)
 └── PROJECT.md               # full design document
 ```
 
@@ -252,7 +253,12 @@ environment we tested (Linux, Python 3.12) is in `requirements.lock`.
 together they can fail with `cannot allocate memory in static TLS block`. `import nirikshak`
 handles this automatically by restarting the command once with
 `GLIBC_TUNABLES=glibc.rtld.optional_static_tls=4096` set (see `nirikshak/_runtime.py`).
-In Jupyter, set that variable before starting the notebook server instead.
+In Jupyter, set that variable before starting the notebook server instead:
+
+```bash
+pip install jupyterlab
+GLIBC_TUNABLES=glibc.rtld.optional_static_tls=4096 jupyter lab notebooks/walkthrough.ipynb
+```
 
 ### 3. Run it
 
@@ -395,6 +401,25 @@ Nirikshak gives two outputs per session (20 key blocks + 20 reference blocks):
 Honest QBER stayed at 1.7-1.9% over 22 hours, and in every session the reference rounds sat
 within 0.2 points of the key rounds, which is what lets them calibrate the alarm.
 
+### Second machine: `ibm_marrakesh`, batch 7 (job `dbd3bts24mrc73cklb10`, 22 Oct 21:42)
+
+Same circuits, same detector settings, nothing retuned. Marrakesh is twice as noisy (honest QBER
+3.5-3.9%, reference rounds 3.4-3.8%), and its two-qubit gates make the entangling probe much more
+visible.
+
+| Condition | Key QBER | BB84 key rate | Session verdict | Nirikshak, per block | 11% rule, per block |
+| :--- | :-: | :-: | :-: | :-: | :-: |
+| Honest (3 sessions) | 3.5-3.9% | 0.52-0.56 | **0 of 3 flagged** | 3% (0%-12%) | 0% |
+| Intercept-resend, 1 of 16 rounds | 4.9% | 0.43 | **attack**, p = 0.0035 | 5% | 0% |
+| Intercept-resend, 2 of 16 rounds | 7.0% | 0.27 | **attack** | 85% | 0% |
+| Intercept-resend, 4 of 16 rounds | 9.5% | 0.10 | **attack** | 100% | 10% |
+| Intercept-resend, 8 of 16 rounds | 15.0% | 0 (abort) | **attack** | 100% | 95% |
+| Entangling probe (3 settings) | 7.6-11.4% | 0-0.22 | **attack** (3 of 3) | 95-100% | 10-55% |
+
+The 1 of 16 attack shows why the session verdict is the decision: on a noisier machine only 1 of
+its 20 blocks crossed the block threshold, but pooling all 20 against the reference blocks still
+flagged the session.
+
 ### Simulation: does the session verdict keep its 5% budget?
 
 | Simulated condition | Honest sessions | Flagged |
@@ -408,7 +433,7 @@ within 0.2 points of the key rounds, which is what lets them calibrate the alarm
 
 Every detector except Nirikshak is trained or calibrated on simulated data
 (`data/sim/train.parquet`) for 5% false alarms per block, then tested on drifted simulation, a
-Kingston noise snapshot and four hardware batches.
+Kingston noise snapshot and five hardware batches on two machines.
 
 | Detector | False alarms per block, worst test set | Where |
 | :--- | :-: | :--- |
@@ -420,21 +445,22 @@ Kingston noise snapshot and four hardware batches.
 
 - When hardware noise happens to match the simulation (batches 3-5, 1.7%), the sim-trained
   detectors work and detect slightly more per block than Nirikshak.
-- When it does not (batch 2, 4% noise floor; drifted simulation), they flag 82-88% of honest
-  blocks. In the Kingston snapshot they instead miss small attacks (22-28% vs 78%).
+- When it does not, they flag most honest blocks: 78-83% on `ibm_marrakesh` (3.6% noise floor),
+  82-88% on batch 2 (4%) and in drifted simulation. Nirikshak flags 3% on marrakesh. In the Kingston snapshot they instead miss small attacks (22-28% vs 78%).
 - Nirikshak's worst case is batch 5: 8 of 60 honest blocks, spread over 3 sessions whose
   session verdicts were all clean. Reference rounds also help ML: XGBoost with reference
   features drops from 88% to 25% worst-case false alarms.
 
 ### What real hardware taught us
 
-| Batch (`ibm_kingston`) | Timing between preparation and measurement | Honest QBER | Rounds Eve did not touch |
+| Batch | Timing between preparation and measurement | Honest QBER | Rounds Eve did not touch |
 | :--- | :--- | :-: | :-: |
 | 1 (`dbcdge9gv2cc73ea4ne0`) | not matched | 0.7% | 2.6-6.4%: they idled during her measurements |
 | 2 (`dbcdpek24mrc73cjedeg`) | matched, plain idle | 4.2% (X basis 7%) | 4.4-6.3%: fair, but idling dephases |
 | 3 (`dbcdsck24mrc73cjek9g`) | matched, spin echo | 1.7% | 1.6-1.75%: fair and low |
 | 4 (`dbce8c0c77vs738641j0`) | matched, spin echo | 1.75% | 1.8-1.9% |
 | 5 (`dbd0vo424mrc73cki1l0`) | matched, spin echo, 21 h later | 1.8% | 1.6-2.5% |
+| 7, `ibm_marrakesh` (`dbd3bts24mrc73cklb10`) | matched, spin echo | 3.6% | 3.6-4.5% |
 
 Batch 1's detection rates (100% everywhere) were inflated by this artifact and are not
 claimed; batches 1-2 are excluded from all pooled hardware numbers. A qubit-0 readout failure
@@ -469,7 +495,8 @@ operator integration.
 
 ### Limitations
 
-- One backend so far, three usable batches over 22 hours, 3 sessions per condition per batch.
+- Two backends: three usable `ibm_kingston` batches over 22 hours and one `ibm_marrakesh` batch,
+  3 sessions per condition per batch.
   Nine honest hardware sessions bound the session false-alarm rate only to 0-34%; the 5% claim
   rests on 600 simulated honest sessions.
 - Block alarms vary between sessions (up to 15% of one honest hardware session's blocks), because
@@ -516,7 +543,7 @@ The IBM Quantum Open Plan gives 10 minutes (600 s) of quantum time per rolling 2
 window per account; check yours with `get_service().usage()`. Session mode is not
 available; use job or batch mode. At most 3 jobs can be queued or running at once.
 IBM's quick usage estimate is `2 + 0.00035 x executions` seconds per job; a 10-session batch
-(25,600 executions) used 10 s. Used so far: 53 s of 600 on one account. Test every
+(25,600 executions) used 10 s. Used so far: 63 s of 600 on one account. Test every
 circuit on the simulator first, and combine circuits into few large jobs.
 
 ---
@@ -532,10 +559,10 @@ circuit on the simulator first, and combine circuits into few large jobs.
 - [x] `git clone` → `pip install` → run works on a clean machine
 - [x] Results table included, with a classical baseline
 - [x] Tests included and passing (`pytest -q`)
-- [ ] Notebooks committed with outputs cleared
+- [x] Notebooks committed with outputs cleared (`notebooks/walkthrough.ipynb`)
 - [ ] Demo video or live demo slot confirmed
 - [x] `LICENSE` file added
-- [ ] Latest changes merged into `main`
+- [x] Latest changes merged into `main`
 
 ---
 

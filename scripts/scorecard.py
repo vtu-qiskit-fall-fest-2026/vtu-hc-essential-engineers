@@ -94,20 +94,22 @@ def main() -> None:
                            "11% rule blocks", "Session p-value", "Session verdict"],
                           [r for _, r in sorted(rows, key=lambda t: t[0])])
 
-    # ---- Hardware, pooled block-level rates (spin-echo batches only)
+    # ---- Hardware, pooled block-level rates (spin-echo batches only), one table per backend
     if echo_blocks:
-        blocks = pd.concat(echo_blocks)
-        sess_hw = pd.DataFrame([r for r in session_rows if r["timing"] == "echo"])
-        n_batches = blocks["session_id"].str.split(":").str[0].nunique()
-        lines += [f"## Real hardware, pooled over {n_batches} spin-echo batch(es)", ""]
-        rows = []
-        for lbl, g in sorted(blocks.groupby("condition"), key=lambda t: order_key(t[0])):
-            sg = sess_hw[sess_hw.condition == lbl]
-            rows.append([lbl, str(len(g)), fmt_rate(int(g.alarm.sum()), len(g)), fmt_rate(int(g.rule.sum()), len(g)),
-                         fmt_rate(int(sg.session_alarm.sum()), len(sg))])
-        lines += ["Honest row: false alarms. Other rows: detection.", ""]
-        lines += md_table(["Condition", "Blocks", "Nirikshak, per block", "11% rule, per block",
-                           "Nirikshak, per session"], rows)
+        all_blocks = pd.concat(echo_blocks)
+        all_sess = pd.DataFrame([r for r in session_rows if r["timing"] == "echo"])
+        for backend, blocks in all_blocks.groupby("backend_name", sort=True):
+            jobs = set(blocks["session_id"].str.split(":").str[0])
+            sess_hw = all_sess[all_sess["job_id"].isin(jobs)]
+            lines += [f"## Real hardware, `{backend}`, pooled over {len(jobs)} spin-echo batch(es)", ""]
+            rows = []
+            for lbl, g in sorted(blocks.groupby("condition"), key=lambda t: order_key(t[0])):
+                sg = sess_hw[sess_hw.condition == lbl]
+                rows.append([lbl, str(len(g)), fmt_rate(int(g.alarm.sum()), len(g)), fmt_rate(int(g.rule.sum()), len(g)),
+                             fmt_rate(int(sg.session_alarm.sum()), len(sg))])
+            lines += ["Honest row: false alarms. Other rows: detection.", ""]
+            lines += md_table(["Condition", "Blocks", "Nirikshak, per block", "11% rule, per block",
+                               "Nirikshak, per session"], rows)
 
     # ---- Simulation, session level
     lines += ["## Simulation, session verdict", "",
