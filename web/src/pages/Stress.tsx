@@ -2,13 +2,20 @@ import { useState } from 'react'
 import { HeatTable, WorstBars } from '../charts/charts'
 import { useData, type Stress as S } from '../data'
 
+const rowLabel = (t: string) => t
+  .replace('sim: training conditions', 'Simulation, training noise')
+  .replace('sim: drifted noise', 'Simulation, drifted noise')
+  .replace('sim: Kingston noise snapshot', 'Simulation, Kingston snapshot')
+  .replace(/^hardware: (\S+) batch (\d+) \((.*)\)$/, (_m, b, n, t) =>
+    `${b.replace('ibm_', '')} batch ${n}, ${/NOT/.test(t) ? 'timing unmatched' : /plain/.test(t) ? 'plain wait' : 'spin echo'}`)
+
 const short = (t: string) => t.replace('hardware: ', '').replace(/ \(timing.*\)$/, '').replace('sim: ', 'simulation, ')
   .replace(/ \((timing )?NOT matched\)/, '')
 
 export default function Stress() {
   const d = useData<S>('stress')
   const [cond, setCond] = useState<string | null>(null)
-  if (!d) return <div className="loading">Loading stress test...</div>
+  if (!d) return null
 
   const conditions = Array.from(new Set(d.rows.map((r) => r.condition))).filter((c) => !c.startsWith('honest'))
   const selCond = cond ?? conditions.find((c) => c.includes('1/16')) ?? conditions[0]
@@ -20,54 +27,59 @@ export default function Stress() {
 
   return (
     <>
-      <div className="page-head">
-        <span className="eyebrow">Simulation to hardware stress test</span>
-        <h1>Detectors trained in simulation break on real noise</h1>
-        <p className="lede">
-          Every detector here except Nirikshak is trained or calibrated on simulated BB84 data for 5% false alarms,
-          then tested on drifted simulation, a Kingston noise snapshot and every hardware batch. When the noise moves,
-          the simulation-trained detectors flag most honest blocks. Nirikshak recalibrates on each session's own
-          reference rounds.
-        </p>
-      </div>
-
-      <div className="card">
-        <div className="card-title">
-          <h3>Worst-case false alarms outside training conditions</h3>
-          <span className="sub">share of honest blocks flagged, worst test set</span>
-        </div>
-        <WorstBars budget={d.alpha} highlight="Nirikshak"
-          rows={worst.map((w) => ({ label: w.detector, value: w.rate, where: short(w.where) }))} />
-        {nk && (
-          <p className="note" style={{ marginTop: 10 }}>
-            Nirikshak's worst case ({Math.round(nk.rate * 100)}%, {short(nk.where)}) is per block: 8 of 60 honest blocks
-            spread over 3 sessions, all of which got a clean session verdict. Block thresholds rest on 20 reference
-            blocks, so they vary between sessions; the session verdict keeps its 5% budget.
+      <section className="hero">
+        <div className="hero-top">
+          <h1 className="statement">Trained in simulation, lost on real noise.</h1>
+          <p className="prose">
+            Every detector here except Nirikshak learns from simulated BB84 data and is tuned for 5% false alarms. We then
+            test them all on drifted simulation, a Kingston noise snapshot and every hardware batch. When the noise moves,
+            the trained detectors flag most honest blocks. Nirikshak has nothing to retrain: it recalibrates on each
+            session's own reference rounds.
           </p>
-        )}
-      </div>
-
-      <section className="section">
-        <div className="section-head">
-          <h2>False alarms on every test set</h2>
-          <p>Share of honest blocks flagged. Darker is worse.</p>
-        </div>
-        <div className="card">
-          <HeatTable rows={d.test_sets} cols={d.detectors} value={get(honestCond)} good="low" />
         </div>
       </section>
 
-      <section className="section">
-        <div className="section-head">
-          <h2>Detection on every test set</h2>
-          <p>Share of attacked blocks flagged. Darker means more missed. When noise matches training, the simulation-trained
-            detectors detect slightly more per block; elsewhere they either drown in false alarms or miss small attacks.</p>
+      <section className="finding">
+        <div className="gutter">
+          <h2 className="title">Worst case outside training</h2>
+          <p className="note">Share of honest blocks flagged on the worst test set, excluding the training conditions.</p>
         </div>
-        <div className="card" style={{ display: 'grid', gap: 14 }}>
+        <div className="body">
+          <div className="plate">
+            <WorstBars budget={d.alpha} highlight="Nirikshak"
+              rows={worst.map((w) => ({ label: w.detector, value: w.rate, where: short(w.where) }))} />
+          </div>
+          {nk && (
+            <p className="note">
+              Nirikshak's worst case, {Math.round(nk.rate * 100)}% on {short(nk.where)}, is 8 of 60 honest blocks spread
+              over 3 sessions, and all 3 got a clean session verdict. A block threshold rests on only 20 reference blocks,
+              so it varies from session to session; the session verdict keeps its 5% budget.
+            </p>
+          )}
+        </div>
+      </section>
+
+      <section className="finding">
+        <div className="gutter">
+          <h2 className="title">False alarms, every test set</h2>
+          <p className="note">Share of honest blocks flagged. Deeper red is worse.</p>
+        </div>
+        <div className="body">
+          <div className="plate"><HeatTable rows={d.test_sets} cols={d.detectors} value={get(honestCond)} good="low" rowLabel={rowLabel} /></div>
+        </div>
+      </section>
+
+      <section className="finding">
+        <div className="gutter">
+          <h2 className="title">Detection, every test set</h2>
+          <p className="note">Share of attacked blocks flagged; deeper red means more missed. Where noise matches training
+            the trained detectors catch slightly more per block. Elsewhere they either flag everything or miss small attacks.</p>
+        </div>
+        <div className="body">
           <div className="seg">
             {conditions.map((c) => <button key={c} className={c === selCond ? 'on' : ''} onClick={() => setCond(c)}>{c}</button>)}
           </div>
-          <HeatTable rows={d.test_sets} cols={d.detectors} value={get(selCond)} good="high" />
+          <div className="plate"><HeatTable rows={d.test_sets} cols={d.detectors} value={get(selCond)} good="high" rowLabel={rowLabel} /></div>
         </div>
       </section>
     </>

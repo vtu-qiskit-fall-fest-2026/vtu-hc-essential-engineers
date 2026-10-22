@@ -11,44 +11,45 @@ export default function How() {
 
   return (
     <>
-      <div className="page-head">
-        <span className="eyebrow">How it works</span>
-        <h1>Ask "noisier than today's normal?", not "above 11%?"</h1>
-        <p className="lede">
-          BB84 reveals an eavesdropper through errors, but hardware makes errors too, and its noise drifts. A fixed
-          threshold either misses a careful eavesdropper or cries wolf when the device drifts. Nirikshak measures
-          today's normal on the same qubits, in the same run, and compares against that.
-        </p>
-      </div>
-
-      <div className="steps">
-        <div className="card"><span className="num">01</span><h3>Key rounds</h3>
-          <p>Alice sends random bits in random bases; Bob measures in random bases. Eve may intercept some rounds. Rounds
-            where the bases match are kept; their error rate is the QBER.</p></div>
-        <div className="card"><span className="num">02</span><h3>Reference rounds</h3>
-          <p>In the same job, on the same qubits, an honest calibration circuit runs with no channel and no attack slot.
-            Eve cannot touch it, but it sees the same device noise and drift.</p></div>
-        <div className="card"><span className="num">03</span><h3>Threshold from today</h3>
-          <p>Split-conformal calibration on the reference blocks sets each session's alarm threshold, so honest blocks
-            cross it about 5% of the time, whatever the noise level.</p></div>
-        <div className="card"><span className="num">04</span><h3>Session verdict</h3>
-          <p>A permutation test asks whether the key blocks are noisier than the reference blocks. Under no attack it
-            fires in at most 5% of sessions; pooling 20 blocks catches attacks no single block shows.</p></div>
-      </div>
-
-      <section className="section">
-        <div className="section-head">
-          <h2>Try it</h2>
-          <p>Precomputed simulated sessions (Qiskit Aer). Pick the device noise and how many of the 16 rounds per shot Eve
-            intercepts. The 11% rule only reacts to the total; Nirikshak reacts to the gap between key and reference.</p>
+      <section className="hero">
+        <div className="hero-top">
+          <h1 className="statement">Noisier than today's normal?</h1>
+          <p className="prose">
+            BB84 reveals an eavesdropper through errors, but hardware makes errors too, and its noise drifts. A fixed line
+            either misses a careful eavesdropper or raises alarms whenever the device drifts. Nirikshak measures today's
+            normal on the same qubits, in the same run, and asks whether the key rounds are noisier than that.
+          </p>
         </div>
-        {!d ? <div className="loading">Loading simulator...</div> : (() => {
+        <div className="process">
+          <div><span className="step"><span>1</span>Key rounds</span>
+            <p>Alice sends random bits in random bases and Bob measures in random bases. Eve may intercept some rounds.
+              Rounds where the bases match are kept; their error rate is the QBER.</p></div>
+          <div><span className="step"><span>2</span>Reference rounds</span>
+            <p>In the same job, on the same qubits, an honest calibration circuit runs with no channel and no slot for Eve.
+              She cannot touch it, but it sees the same device noise and drift.</p></div>
+          <div><span className="step"><span>3</span>Threshold from today</span>
+            <p>Split-conformal calibration on the reference blocks sets each session's threshold, so honest blocks cross it
+              about 5% of the time at any noise level.</p></div>
+          <div><span className="step"><span>4</span>Session verdict</span>
+            <p>A permutation test asks whether the key blocks are noisier than the reference blocks. Honest sessions are
+              flagged at most 5% of the time; pooling 20 blocks catches attacks no single block shows.</p></div>
+        </div>
+      </section>
+
+      <section className="finding">
+        <div className="gutter">
+          <h2 className="title">Try it</h2>
+          <p className="note">Simulated sessions from Qiskit Aer, computed in advance. Choose the device noise and how many
+            of the 16 rounds per shot Eve intercepts. The 11% rule reacts to the total; Nirikshak reacts to the gap
+            between key and reference rounds.</p>
+        </div>
+        <div className="body">{!d ? null : (() => {
           const cell = d.grid.find((g) => g.readout === d.readouts[ri] && g.rounds === d.rounds[ki])!
           const honest = d.grid.find((g) => g.readout === d.readouts[ri] && g.rounds === 0)!
           const yMax = Math.max(0.12, ...d.grid.filter((g) => g.readout === d.readouts[ri]).flatMap((g) => g.key_blocks)) * 1.05
           return (
-            <div className="grid-2 wide-left">
-              <div className="card" style={{ display: 'grid', gap: 14 }}>
+            <div className="split">
+              <div className="plate" style={{ display: 'grid', gap: 14 }}>
                 <div className="controls">
                   <div className="control"><span>Device readout error</span>
                     <div className="seg">{d.readouts.map((r, i) => <button key={r} className={i === ri ? 'on' : ''} onClick={() => setRi(i)}>{pct(r, 1)}</button>)}</div>
@@ -68,8 +69,8 @@ export default function How() {
                   ...(cell.rounds ? [{ label: `Eve on ${cell.rounds} of 16`, is_attack: true, threshold: cell.threshold, key_blocks: cell.key_blocks, ref_blocks: cell.ref_blocks, verdict: cell.verdict, p_value: cell.p_value }] : []),
                 ]} />
               </div>
-              <div className="card" style={{ display: 'grid', gap: 14, alignContent: 'start' }}>
-                <h3>{cell.rounds ? `Eve on ${cell.rounds} of 16 rounds` : 'No eavesdropper'}</h3>
+              <div className="plate" style={{ display: 'grid', gap: 14, alignContent: 'start' }}>
+                <h3 className="subtitle">{cell.rounds ? `Eve on ${cell.rounds} of 16 rounds` : 'No eavesdropper'}</h3>
                 <table>
                   <tbody>
                     <tr><td>Key QBER</td><td className="num"><b>{pct(cell.key_qber, 2)}</b></td></tr>
@@ -90,16 +91,18 @@ export default function How() {
               </div>
             </div>
           )
-        })()}
+        })()}</div>
       </section>
 
-      <section className="section">
-        <div className="section-head">
-          <h2>Where the 11% comes from</h2>
-          <p>
+      <section className="finding">
+        <div className="gutter">
+          <h2 className="title">Where 11% comes from</h2>
+        </div>
+        <div className="body">
+          <p className="prose">
             It is the Shor-Preskill limit for distilling any secret key: the BB84 key rate 1 − 2h(QBER) reaches zero at
-            11%. Below it, privacy amplification can still protect an ideal key, but the operator never learns the link
-            is being tapped, cannot locate it, and cannot tell an attack from drift. Nirikshak is that missing
+            11%. Below it, privacy amplification can still protect an ideal key, but the operator never learns that the
+            link is being tapped, cannot locate the tap, and cannot tell an attack from drift. Nirikshak is that missing
             intrusion-detection layer.
           </p>
         </div>
