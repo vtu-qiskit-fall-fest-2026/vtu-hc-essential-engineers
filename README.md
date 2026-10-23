@@ -35,6 +35,12 @@ honest blocks once noise shifted.
 | **Event** | VTU-QFF Hackathon, VTU-Qiskit Fall Fest 2026 |
 | **Demo video** | [youtu.be/gO9v1e-yHNs](https://youtu.be/gO9v1e-yHNs) (4:46) |
 | **Live app** | [vtu-qiskit-fall-fest-2026.github.io/vtu-hc-essential-engineers](https://vtu-qiskit-fall-fest-2026.github.io/vtu-hc-essential-engineers/) |
+| **Slides** | [PDF](docs/VTU-QFF-HC-0173.pdf) · [PPTX](docs/VTU-QFF-HC-0173.pptx) |
+
+<a href="https://vtu-qiskit-fall-fest-2026.github.io/vtu-hc-essential-engineers/"><img src="docs/web_app.png" alt="Nirikshak web app: real ibm_kingston attacks against the 11% rule" width="58%"></a>
+<a href="https://youtu.be/gO9v1e-yHNs"><img src="https://img.youtube.com/vi/gO9v1e-yHNs/hqdefault.jpg" alt="Watch the 4:46 demo video" width="38%"></a>
+
+*Left: the live app (every marker is a real attack on `ibm_kingston`). Right: the demo video.*
 
 </div>
 
@@ -134,7 +140,7 @@ blocks against reference blocks gives one verdict (attack or clean) with a p-val
 flowchart LR
     A[Random BB84 choices<br/>bits, bases] --> B[Key circuits, attacked or not<br/>+ honest reference circuit<br/>same qubits, same timing]
     B --> C1[Aer simulator<br/>noise models, drift]
-    B --> C2[IBM Kingston<br/>Heron r2]
+    B --> C2[IBM Heron r2<br/>Kingston, Marrakesh, Fez]
     C1 --> D[Bit logs + layout<br/>+ calibration snapshot]
     C2 --> D
     D --> E[Features<br/>per block, per qubit]
@@ -155,7 +161,7 @@ flowchart LR
    and a calibration snapshot.
 4. **Post-processing:** sifting, QBER per basis, basis asymmetry, per-qubit error rates.
 5. **Output:** per-session verdicts and p-values, per-block alarms, BB84 key rates, scored as
-   false-alarm and detection rates with 95% intervals, shown in a Streamlit dashboard.
+   false-alarm and detection rates with 95% intervals, shown in the web app and a Streamlit dashboard.
 
 ---
 
@@ -214,6 +220,7 @@ vtu-hc-essential-engineers/
 │   ├── export_web.py        # results as JSON for the web frontend
 │   └── hardware_lessons.py  # per-batch honest / touched / untouched QBER from raw bits
 ├── results/                 # scorecard, stress test, sessions.csv, hardware_lessons.csv, figures/
+├── docs/                    # slides (PDF, PPTX) and the web app screenshot
 ├── tests/                   # pytest suite
 ├── data/hardware/           # hardware block datasets (one parquet per job)
 ├── data/sim/                # simulated block datasets (train, test, drift, kingston, honest-only)
@@ -534,6 +541,25 @@ operator integration.
 
 ## Reproduce the Results
 
+**Checked from a clean clone (23 Oct 2026):** a fresh clone of `main` in a new virtual environment
+installed, passed all tests, ran the demo, the network monitor and the walkthrough notebook, and built
+the web app. `python -m src.main` then rewrote every file in `results/` and `web/src/results/` byte for
+byte: `git status` showed no changes. (`results/hardware_lessons.csv` is the exception that needs
+`data/raw/` from the collecting machine; it is not rewritten by `src.main`.)
+
+**Tests** (`pytest -q`, 28 tests, also run by GitHub Actions on every push):
+
+| Area | Tests | What they check |
+| :--- | :-: | :--- |
+| BB84 and attacks | 5 | No attack gives zero errors; full intercept-resend gives 25% QBER; a partial attack stays under 11%; the entangling probe disturbs less than full intercept |
+| Sessions | 5 | Reference rounds stay clean while an attack shows only in key rounds; seeds reproduce; the conformal threshold keeps its false-alarm rate under drift and catches a shift a fixed threshold misses |
+| Statistics | 4 | Key rate reaches zero at 11%; exact intervals contain the rate; the permutation test is calibrated and sensitive |
+| Network monitor | 4 | Telemetry validation and round trip; windows close correctly; honest drift keeps the budget while an attack is caught |
+| Hardware layout | 4 | Qubits are spread out and skip excluded ones; probe ancillas are coupled; the compiled circuit uses the picked qubits; a bad qubit is flagged |
+| Detectors | 3 | Conformal false-alarm rate holds; scorecard counts; the threshold baseline |
+| Hardware batch | 2 | Key and reference circuits share qubits; timing matching gives every circuit the same slot |
+| Runtime | 1 | Aer and scikit-learn load together on Linux |
+
 The simulated and hardware datasets are committed, so everything below the hardware step runs
 straight away:
 
@@ -593,6 +619,9 @@ circuit on the simulator first, and combine circuits into few large jobs.
 
 | Resource | Link |
 | :--- | :--- |
+| Demo video (4:46) | https://youtu.be/gO9v1e-yHNs |
+| Live app | https://vtu-qiskit-fall-fest-2026.github.io/vtu-hc-essential-engineers/ |
+| Slides | [docs/VTU-QFF-HC-0173.pdf](docs/VTU-QFF-HC-0173.pdf) ([PPTX](docs/VTU-QFF-HC-0173.pptx)) |
 | Git & collaboration handbook | [Git & Collaboration Handbook](../vtu-hc-guide-git-and-collaboration) |
 | Problem statements, solutions & terms | [Problem Statements, Solutions & Terms](../vtu-hc-guide-problem-and-solution) |
 | README writing guide | [README Guide & Template](../vtu-hc-guide-readme-template) |
