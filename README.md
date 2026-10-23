@@ -574,7 +574,7 @@ circuit on the simulator first, and combine circuits into few large jobs.
 ## Submission Checklist
 
 - [x] Repository created and **public**
-- [ ] All team members added as **collaborators** and invitations accepted
+- [x] All team members added as **collaborators** and invitations accepted
 - [x] Team members listed in this README with their GitHub usernames
 - [x] Problem statement and proposed solution clearly described
 - [x] Quantum approach explained (with a diagram)
