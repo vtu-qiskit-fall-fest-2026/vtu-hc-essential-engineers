@@ -25,13 +25,16 @@ function useRoute() {
 }
 
 function useTheme(): [string, () => void] {
-  const stored = (() => { try { return localStorage.getItem('theme') } catch { return null } })()
-  const [theme, setTheme] = useState<string>(stored ?? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'))
-  useEffect(() => {
-    document.documentElement.dataset.theme = theme
-    try { localStorage.setItem('theme', theme) } catch { /* private mode */ }
-  }, [theme])
-  return [theme, () => setTheme((t) => (t === 'dark' ? 'light' : 'dark'))]
+  // Light by default; dark only after the visitor picks it. 'theme' held auto-detected values, so a new key.
+  const stored = (() => { try { return localStorage.getItem('theme-choice') } catch { return null } })()
+  const [theme, setTheme] = useState<string>(stored === 'dark' ? 'dark' : 'light')
+  useEffect(() => { document.documentElement.dataset.theme = theme }, [theme])
+  const toggle = () => setTheme((t) => {
+    const next = t === 'dark' ? 'light' : 'dark'
+    try { localStorage.setItem('theme-choice', next) } catch { /* private mode */ }
+    return next
+  })
+  return [theme, toggle]
 }
 
 export default function App() {
