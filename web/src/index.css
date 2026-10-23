@@ -38,24 +38,6 @@
   --deva: "Tiro Devanagari Hindi", serif;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
-    color-scheme: dark;
-    --paper: #0f1724;
-    --plate: #141d2b;
-    --plate-2: #1b2636;
-    --rule: #2a3648;
-    --rule-soft: #212c3c;
-    --ink: #eef2f7;
-    --ink-2: #b4c0cf;
-    --ink-3: #8593a6;
-    --key: #3987e5;
-    --key-soft: rgba(57, 135, 229, 0.16);
-    --ref: #d95926;
-    --alarm-soft: rgba(208, 59, 59, 0.16);
-    --ok: #4cc94c;
-  }
-}
 :root[data-theme="dark"] {
   color-scheme: dark;
   --paper: #0f1724;
