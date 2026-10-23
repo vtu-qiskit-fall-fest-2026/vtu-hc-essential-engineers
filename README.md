@@ -37,12 +37,17 @@ honest blocks once noise shifted.
 | **Live app** | [vtu-qiskit-fall-fest-2026.github.io/vtu-hc-essential-engineers](https://vtu-qiskit-fall-fest-2026.github.io/vtu-hc-essential-engineers/) |
 | **Slides** | [PDF](docs/VTU-QFF-HC-0173.pdf) · [PPTX](docs/VTU-QFF-HC-0173.pptx) |
 
-<a href="https://vtu-qiskit-fall-fest-2026.github.io/vtu-hc-essential-engineers/"><img src="docs/web_app.png" alt="Nirikshak web app: real ibm_kingston attacks against the 11% rule" width="58%"></a>
-<a href="https://youtu.be/gO9v1e-yHNs"><img src="https://img.youtube.com/vi/gO9v1e-yHNs/hqdefault.jpg" alt="Watch the 4:46 demo video" width="38%"></a>
+<a href="https://vtu-qiskit-fall-fest-2026.github.io/vtu-hc-essential-engineers/"><img src="docs/web_app.png" alt="Nirikshak web app: real ibm_kingston attacks against the 11% rule" width="49%"></a>
+<a href="https://youtu.be/gO9v1e-yHNs"><img src="https://img.youtube.com/vi/gO9v1e-yHNs/maxresdefault.jpg" alt="Watch the 4:46 demo video" width="49%"></a>
 
-*Left: the live app (every marker is a real attack on `ibm_kingston`). Right: the demo video.*
+*Left: the live app (every marker is a real attack on `ibm_kingston`). Right: the full demo video on YouTube.*
 
 </div>
+
+**Watch here:** the first two minutes of the demo (the problem, how Nirikshak works, the results). The full
+4:46 video, including the tour of the app, is on [YouTube](https://youtu.be/gO9v1e-yHNs).
+
+https://github.com/user-attachments/assets/1529200a-6800-448d-9514-07f3fd6f8d55
 
 ---
 
