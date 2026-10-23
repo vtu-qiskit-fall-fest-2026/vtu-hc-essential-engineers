@@ -33,6 +33,8 @@ honest blocks once noise shifted.
 | **Repository** | [vtu-hc-essential-engineers](https://github.com/vtu-qiskit-fall-fest-2026/vtu-hc-essential-engineers.git) |
 | **Organisation** | [vtu-qiskit-fall-fest-2026](https://github.com/vtu-qiskit-fall-fest-2026) |
 | **Event** | VTU-QFF Hackathon, VTU-Qiskit Fall Fest 2026 |
+| **Demo video** | [youtu.be/gO9v1e-yHNs](https://youtu.be/gO9v1e-yHNs) (4:46) |
+| **Live app** | [vtu-qiskit-fall-fest-2026.github.io/vtu-hc-essential-engineers](https://vtu-qiskit-fall-fest-2026.github.io/vtu-hc-essential-engineers/) |
 
 </div>
 
@@ -285,7 +287,8 @@ npm run dev                       # http://localhost:5173
 Pages: hardware results, network monitor (replays a day of link verdicts), stress test, and how it
 works with a simulator. Needs Node 20 or newer. The data comes from `python scripts/export_web.py`
 (run by `python -m src.main`; add `--sim` to regenerate the simulator grid). On every push to
-`main` that touches `web/`, `.github/workflows/pages.yml` publishes it to GitHub Pages.
+`main` that touches `web/`, `.github/workflows/pages.yml` publishes it to GitHub Pages:
+<https://vtu-qiskit-fall-fest-2026.github.io/vtu-hc-essential-engineers/>.
 
 ### 5. Optional: IBM Quantum hardware
 
@@ -571,7 +574,7 @@ circuit on the simulator first, and combine circuits into few large jobs.
 ## Submission Checklist
 
 - [x] Repository created and **public**
-- [ ] All team members added as **collaborators** and invitations accepted
+- [x] All team members added as **collaborators** and invitations accepted
 - [x] Team members listed in this README with their GitHub usernames
 - [x] Problem statement and proposed solution clearly described
 - [x] Quantum approach explained (with a diagram)
@@ -580,7 +583,7 @@ circuit on the simulator first, and combine circuits into few large jobs.
 - [x] Results table included, with a classical baseline
 - [x] Tests included and passing (`pytest -q`)
 - [x] Notebooks committed with outputs cleared (`notebooks/walkthrough.ipynb`)
-- [ ] Demo video or live demo slot confirmed
+- [x] Demo video or live demo slot confirmed ([video](https://youtu.be/gO9v1e-yHNs))
 - [x] `LICENSE` file added
 - [x] Latest changes merged into `main`
 
